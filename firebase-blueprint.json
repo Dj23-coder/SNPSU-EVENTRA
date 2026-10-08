@@ -1,0 +1,71 @@
+{
+  "entities": {
+    "Event": {
+      "title": "Event",
+      "description": "A campus event posted by an authorized club at Sapthagiri NPS University.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string", "maxLength": 150 },
+        "clubId": { "type": "string", "maxLength": 100 },
+        "clubName": { "type": "string", "maxLength": 100 },
+        "isClubVerified": { "type": "boolean" },
+        "shortDescription": { "type": "string", "maxLength": 200 },
+        "eventType": { "type": "string", "enum": ["Competition", "Workshop", "Fest", "Talk", "Other"] },
+        "date": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" },
+        "startTime": { "type": "string", "pattern": "^[0-9]{2}:[0-9]{2}$" },
+        "endTime": { "type": "string", "pattern": "^[0-9]{2}:[0-9]{2}$" },
+        "venue": { "type": "string", "maxLength": 120 },
+        "certificateProvided": { "type": "boolean" },
+        "prize": { "type": "string", "maxLength": 150 },
+        "registrationLink": { "type": "string", "maxLength": 500 },
+        "registrationDeadline": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" },
+        "posterUrl": { "type": "string", "maxLength": 1000 },
+        "contactName": { "type": "string", "maxLength": 100 },
+        "contactWhatsApp": { "type": "string", "pattern": "^[0-9]{10}$" },
+        "status": { "type": "string", "enum": ["Scheduled", "Cancelled", "Postponed", "Venue Changed"] },
+        "statusNote": { "type": "string", "maxLength": 300 },
+        "lastUpdated": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": [
+        "title",
+        "clubId",
+        "clubName",
+        "shortDescription",
+        "eventType",
+        "date",
+        "startTime",
+        "endTime",
+        "venue",
+        "contactName",
+        "contactWhatsApp",
+        "status"
+      ]
+    },
+    "Club": {
+      "title": "Club",
+      "description": "An authorized student organization at Sapthagiri NPS University.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "maxLength": 100 },
+        "email": { "type": "string", "maxLength": 150 },
+        "category": { "type": "string", "maxLength": 50 },
+        "isVerified": { "type": "boolean" },
+        "role": { "type": "string", "enum": ["club", "admin"] },
+        "coordinatorName": { "type": "string", "maxLength": 100 },
+        "contactPhone": { "type": "string", "maxLength": 15 }
+      },
+      "required": ["name", "email", "category", "role"]
+    }
+  },
+  "firestore": {
+    "/events/{eventId}": {
+      "schema": "Event",
+      "description": "Collection of all student campus events"
+    },
+    "/clubs/{clubId}": {
+      "schema": "Club",
+      "description": "Collection of authorized clubs provisioned by university admin"
+    }
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "name": "SNPSU EVENTRA",
+  "description": "Unified campus event discovery and club event management platform for Sapthagiri NPS University.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

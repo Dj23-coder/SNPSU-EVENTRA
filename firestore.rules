@@ -1,0 +1,55 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Default Deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper functions
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
+
+    // Events validation
+    function isValidEvent(data) {
+      return data.title is string && data.title.size() <= 150 &&
+             data.clubId is string && data.clubId.size() <= 100 &&
+             data.clubName is string && data.clubName.size() <= 100 &&
+             data.shortDescription is string && data.shortDescription.size() <= 200 &&
+             data.venue is string && data.venue.size() <= 120 &&
+             data.contactName is string && data.contactName.size() <= 100 &&
+             data.contactWhatsApp is string && data.contactWhatsApp.size() <= 15;
+    }
+
+    // Public read for students without login; Club and Admin writes
+    match /events/{eventId} {
+      allow read: if isValidId(eventId);
+      allow create: if isSignedIn() && isValidId(eventId) && isValidEvent(incoming());
+      allow update: if isSignedIn() && isValidId(eventId) && isValidEvent(incoming());
+      allow delete: if isSignedIn() && isValidId(eventId);
+    }
+
+    // Clubs collection
+    match /clubs/{clubId} {
+      allow read: if isValidId(clubId);
+      allow write: if isAdmin() && isValidId(clubId);
+    }
+  }
+}
