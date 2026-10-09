@@ -1,8 +1,8 @@
 import { EventItem } from '../types';
+import { TIMEZONE } from '../config/constants';
 
 /**
- * Generate a prefilled Google Calendar link.
- * Format: https://calendar.google.com/calendar/render?action=TEMPLATE&text=...&dates=...&details=...&location=...
+ * Generate a prefilled Google Calendar link in Indian Standard Time (IST).
  */
 export function getGoogleCalendarUrl(event: EventItem): string {
   // Format date and time: YYYY-MM-DD and HH:mm
@@ -10,19 +10,22 @@ export function getGoogleCalendarUrl(event: EventItem): string {
   const cleanStartTime = (event.startTime || '09:00').replace(':', '') + '00';
   const cleanEndTime = (event.endTime || '17:00').replace(':', '') + '00';
 
-  // Construct standard dates parameter: YYYYMMDDTHHmm00/YYYYMMDDTHHmm00
+  // Construct standard dates parameter: YYYYMMDDTHHmm00/YYYYMMDDTHHmm00 in Asia/Kolkata
   const dates = `${cleanDate}T${cleanStartTime}/${cleanDate}T${cleanEndTime}`;
 
-  const details = `${event.shortDescription}\n\nOrganizer: ${event.clubName} (${event.isClubVerified ? 'Verified Club' : 'Club'})\nContact: ${event.contactName}\n${
+  const details = `${event.shortDescription}\n\nOrganizer: ${event.clubName} (${
+    event.isClubVerified ? 'Verified Club' : 'Club'
+  })\nEntry Fee: ${event.entryFee || 'Free'}\nContact: ${event.contactName}\n${
     event.registrationLink ? `Register: ${event.registrationLink}\n` : ''
   }${event.prize ? `Prize: ${event.prize}\n` : ''}${
     event.certificateProvided ? 'Certificate: Provided\n' : ''
-  }\n(SNPSU EVENTRA - Sapthagiri NPS University)`;
+  }\n(Sapthagiri NPS University • SNPSU EVENTRA)`;
 
   const params = new URLSearchParams({
     action: 'TEMPLATE',
     text: `${event.title} [SNPSU]`,
     dates,
+    ctz: TIMEZONE, // Explicit IST
     details,
     location: `${event.venue}, Sapthagiri NPS University, Bengaluru`,
   });
@@ -31,16 +34,97 @@ export function getGoogleCalendarUrl(event: EventItem): string {
 }
 
 /**
- * Generate a WhatsApp message link (wa.me) with a prefilled question.
- * Requirement: opens wa.me with prefilled message "Hi, I have a question about [event title]"
+ * Generate an .ics (iCalendar) file with reminders 1 day before and 1 hour before in IST.
+ */
+export function generateIcsFileContent(event: EventItem): string {
+  const cleanDate = event.date.replace(/-/g, '');
+  const cleanStartTime = (event.startTime || '09:00').replace(':', '') + '00';
+  const cleanEndTime = (event.endTime || '17:00').replace(':', '') + '00';
+
+  const dtStart = `${cleanDate}T${cleanStartTime}`;
+  const dtEnd = `${cleanDate}T${cleanEndTime}`;
+  const dtStamp = new Date().toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+
+  const summary = `${event.title} - Sapthagiri NPS University`;
+  const description = `${event.shortDescription.replace(/\n/g, '\\n')}\\n\\nOrganizer: ${event.clubName}\\nFee: ${event.entryFee || 'Free'}\\nContact: ${event.contactName}`;
+  const location = `${event.venue}, Sapthagiri NPS University, Bengaluru`;
+
+  return [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//SNPSU EVENTRA//Sapthagiri NPS University//EN',
+    'CALSCALE:GREGORIAN',
+    'METHOD:PUBLISH',
+    'X-WR-TIMEZONE:Asia/Kolkata',
+    'BEGIN:VTIMEZONE',
+    'TZID:Asia/Kolkata',
+    'BEGIN:STANDARD',
+    'DTSTART:19700101T000000',
+    'TZOFFSETFROM:+0530',
+    'TZOFFSETTO:+0530',
+    'TZNAME:IST',
+    'END:STANDARD',
+    'END:VTIMEZONE',
+    'BEGIN:VEVENT',
+    `UID:${event.id}-${cleanDate}@eventra.snpsu.edu.in`,
+    `DTSTAMP:${dtStamp}`,
+    `DTSTART;TZID=Asia/Kolkata:${dtStart}`,
+    `DTEND;TZID=Asia/Kolkata:${dtEnd}`,
+    `SUMMARY:${summary}`,
+    `DESCRIPTION:${description}`,
+    `LOCATION:${location}`,
+    'STATUS:CONFIRMED',
+    // Reminder 1: 1 day before (-P1D)
+    'BEGIN:VALARM',
+    'TRIGGER:-P1D',
+    'ACTION:DISPLAY',
+    'DESCRIPTION:Reminder: Event tomorrow at SNPSU',
+    'END:VALARM',
+    // Reminder 2: 1 hour before (-PT1H)
+    'BEGIN:VALARM',
+    'TRIGGER:-PT1H',
+    'ACTION:DISPLAY',
+    'DESCRIPTION:Reminder: Event starts in 1 hour at SNPSU',
+    'END:VALARM',
+    'END:VEVENT',
+    'END:VCALENDAR',
+  ].join('\r\n');
+}
+
+/**
+ * Trigger download of .ics calendar file in the browser
+ */
+export function downloadIcsFile(event: EventItem): void {
+  const icsData = generateIcsFileContent(event);
+  const blob = new Blob([icsData], { type: 'text/calendar;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  const sanitizedTitle = event.title.replace(/[^a-zA-Z0-9]/g, '_').slice(0, 30);
+  link.download = `${sanitizedTitle}_SNPSU.ics`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
+/**
+ * WhatsApp Share link with a friend/group with prefilled event details and app link
+ */
+export function getWhatsAppShareUrl(event: EventItem, currentUrl?: string): string {
+  const shareUrl = currentUrl || window.location.href;
+  const message = `Check out this event at Sapthagiri NPS University! 🎉\n\n📌 *${event.title}*\n🏛️ Club: ${event.clubName}\n📅 Date: ${formatDisplayDate(event.date)}\n⏰ Time: ${formatTime12h(event.startTime)} - ${formatTime12h(event.endTime)}\n📍 Venue: ${event.venue}\n🎟️ Fee: ${event.entryFee || 'Free'}${event.prize ? `\n🏆 Prize: ${event.prize}` : ''}\n\nFind details on SNPSU EVENTRA:\n${shareUrl}`;
+
+  return `https://wa.me/?text=${encodeURIComponent(message)}`;
+}
+
+/**
+ * WhatsApp coordinator direct message (wa.me)
  */
 export function getWhatsAppUrl(event: EventItem): string {
-  // Extract 10-digit number
   let phone = event.contactWhatsApp.replace(/\D/g, '');
   if (phone.length === 10) {
     phone = `91${phone}`;
-  } else if (phone.length === 12 && phone.startsWith('91')) {
-    // Already has 91 country code
   } else if (phone.length > 10) {
     phone = phone.slice(-10);
     phone = `91${phone}`;
@@ -51,8 +135,7 @@ export function getWhatsAppUrl(event: EventItem): string {
 }
 
 /**
- * Masks phone number for card display (e.g. +91 98450 •••••)
- * Requirement: Do not show full number as plain text on the card.
+ * Mask phone number on card (e.g. +91 98450 •••••)
  */
 export function maskPhoneNumber(phone: string): string {
   const digits = phone.replace(/\D/g, '').slice(-10);
@@ -61,7 +144,7 @@ export function maskPhoneNumber(phone: string): string {
 }
 
 /**
- * Format date for friendly display (e.g., Sat, 10 Oct 2026)
+ * Format date for friendly display
  */
 export function formatDisplayDate(dateStr: string): string {
   if (!dateStr) return '';
@@ -73,6 +156,7 @@ export function formatDisplayDate(dateStr: string): string {
       day: 'numeric',
       month: 'short',
       year: 'numeric',
+      timeZone: TIMEZONE,
     });
   } catch {
     return dateStr;
@@ -96,7 +180,7 @@ export function formatTime12h(timeStr: string): string {
 }
 
 /**
- * Check if registration is closing soon (within 3 days from now)
+ * Check if registration is closing soon (within 3 days)
  */
 export function isClosingSoon(event: EventItem): boolean {
   if (event.status === 'Cancelled' || !event.registrationDeadline) return false;
@@ -117,9 +201,6 @@ export function isClosingSoon(event: EventItem): boolean {
   }
 }
 
-/**
- * Format relative deadline warning text (e.g., "Closes tomorrow!", "Closes today!")
- */
 export function getClosingSoonText(deadlineStr: string): string {
   try {
     const today = new Date();

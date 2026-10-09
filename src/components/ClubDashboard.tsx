@@ -8,14 +8,19 @@ import {
   Clock,
   MapPin,
   ShieldCheck,
-  AlertTriangle,
   Building2,
-  CheckCircle,
-  XCircle,
+  Share2,
+  Eye,
+  Heart,
+  CalendarPlus,
+  Sparkles,
+  Check,
+  AlertTriangle,
 } from 'lucide-react';
 import { EventItem, EventStatus } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { formatDisplayDate, formatTime12h } from '../services/calendarService';
+import { generateShareText } from '../services/aiService';
 import { getEventTypeBadgeClass, getStatusBadgeConfig } from './EventCard';
 
 interface ClubDashboardProps {
@@ -41,13 +46,18 @@ export const ClubDashboard: React.FC<ClubDashboardProps> = ({
   const [statusNoteInput, setStatusNoteInput] = useState('');
   const [statusNoteError, setStatusNoteError] = useState('');
 
+  // Share Text Announcement Modal State
+  const [shareTextModalEvent, setShareTextModalEvent] = useState<EventItem | null>(null);
+  const [generatedText, setGeneratedText] = useState<string>('');
+  const [generatingText, setGeneratingText] = useState(false);
+  const [copiedSuccess, setCopiedSuccess] = useState(false);
+
   // Filter ONLY this club's events (or all if admin)
   const myEvents = events.filter(e => {
     if (isAdmin) return true;
     return e.clubId === currentUser?.id;
   });
 
-  // Calculate metrics
   const total = myEvents.length;
   const activeCount = myEvents.filter(e => e.status === 'Scheduled').length;
   const changedCount = myEvents.filter(e => e.status === 'Postponed' || e.status === 'Venue Changed').length;
@@ -77,6 +87,30 @@ export const ClubDashboard: React.FC<ClubDashboardProps> = ({
       statusNoteInput.trim() || undefined
     );
     setStatusChangeModalEvent(null);
+  };
+
+  // Generate WhatsApp Announcement via Gemini API
+  const handleGenerateAnnouncement = async (event: EventItem) => {
+    setShareTextModalEvent(event);
+    setGeneratingText(true);
+    setCopiedSuccess(false);
+
+    try {
+      const text = await generateShareText(event);
+      setGeneratedText(text);
+    } catch {
+      // Offline fallback
+      const fallback = `📢 *${event.title}* by ${event.clubName} at Sapthagiri NPS University!\n\n📅 Date: ${event.date}\n⏰ Time: ${event.startTime} - ${event.endTime}\n📍 Venue: ${event.venue}\n🎟️ Fee: ${event.entryFee || 'Free'}\n${event.prize ? `🏆 Prize: ${event.prize}\n` : ''}${event.certificateProvided ? `📜 Certificate: Provided\n` : ''}${event.registrationLink ? `🔗 Register here: ${event.registrationLink}\n` : ''}${event.registrationDeadline ? `⏳ Deadline: ${event.registrationDeadline}\n` : ''}\nCoordinator: ${event.contactName} (+91 ${event.contactWhatsApp})\n\n_Sapthagiri NPS University • SNPSU EVENTRA_`;
+      setGeneratedText(fallback);
+    } finally {
+      setGeneratingText(false);
+    }
+  };
+
+  const handleCopyText = () => {
+    navigator.clipboard.writeText(generatedText);
+    setCopiedSuccess(true);
+    setTimeout(() => setCopiedSuccess(false), 2000);
   };
 
   return (
@@ -137,15 +171,17 @@ export const ClubDashboard: React.FC<ClubDashboardProps> = ({
         </div>
       </div>
 
-      {/* My Events List */}
+      {/* Managed Events List with Approximate Metrics */}
       <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-xs">
         <div className="pb-4 border-b border-slate-100 flex items-center justify-between mb-4">
-          <h3 className="font-extrabold text-lg text-slate-900">
-            Managed Events ({myEvents.length})
-          </h3>
-          <p className="text-xs text-slate-500">
-            You can create, edit, cancel, and duplicate events for your club.
-          </p>
+          <div>
+            <h3 className="font-extrabold text-lg text-slate-900">
+              Managed Events ({myEvents.length})
+            </h3>
+            <p className="text-xs text-slate-500">
+              Analytics metrics shown below are approximate counts recorded on campus devices.
+            </p>
+          </div>
         </div>
 
         {myEvents.length === 0 ? (
@@ -220,10 +256,42 @@ export const ClubDashboard: React.FC<ClubDashboardProps> = ({
                         <span>{event.venue}</span>
                       </div>
                     </div>
+
+                    {/* APPROXIMATE METRICS BAR (SECTION G.5) */}
+                    <div className="pt-2 flex flex-wrap items-center gap-3 text-xs">
+                      <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">
+                        Approximate Engagement:
+                      </span>
+
+                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-100 text-slate-700 font-semibold" title="Approximate views">
+                        <Eye className="w-3.5 h-3.5 text-slate-500" />
+                        <span>{event.viewsCount || 0} views</span>
+                      </span>
+
+                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-rose-50 text-rose-800 font-semibold border border-rose-200" title="Approximate interested taps">
+                        <Heart className="w-3.5 h-3.5 text-rose-600" />
+                        <span>{event.interestedCount || 0} interested</span>
+                      </span>
+
+                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-blue-50 text-blue-800 font-semibold border border-blue-200" title="Approximate Google Calendar adds">
+                        <CalendarPlus className="w-3.5 h-3.5 text-blue-600" />
+                        <span>{event.calendarClicksCount || 0} calendar adds</span>
+                      </span>
+                    </div>
                   </div>
 
                   {/* Actions Toolbar */}
                   <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto pt-3 lg:pt-0 border-t lg:border-t-0 border-slate-100">
+                    {/* Share Text Announcement Generator */}
+                    <button
+                      onClick={() => handleGenerateAnnouncement(event)}
+                      className="px-3 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-xs font-bold border border-emerald-300 flex items-center gap-1.5 transition active:scale-95"
+                      title="Generate WhatsApp Announcement with Gemini"
+                    >
+                      <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
+                      <span>WhatsApp Announcement</span>
+                    </button>
+
                     {/* Status Changer Button */}
                     <button
                       onClick={() => handleOpenStatusModal(event)}
@@ -269,6 +337,87 @@ export const ClubDashboard: React.FC<ClubDashboardProps> = ({
         )}
       </div>
 
+      {/* Announcement Share Text Modal */}
+      {shareTextModalEvent && (
+        <div
+          className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/70 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-200"
+          onClick={() => setShareTextModalEvent(null)}
+        >
+          <div
+            className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 space-y-4"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Sparkles className="w-5 h-5 text-emerald-600" />
+                <h3 className="font-extrabold text-lg text-slate-900">
+                  WhatsApp Announcement
+                </h3>
+              </div>
+              <button
+                onClick={() => setShareTextModalEvent(null)}
+                className="p-1 rounded-full text-slate-400 hover:text-slate-600"
+              >
+                ✕
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-600">
+              Formatted ready to paste and share directly in SNPSU student groups:
+            </p>
+
+            {generatingText ? (
+              <div className="p-8 text-center text-xs text-slate-500 space-y-2">
+                <Sparkles className="w-6 h-6 text-emerald-600 animate-spin mx-auto" />
+                <p>Generating friendly announcement with Gemini AI...</p>
+              </div>
+            ) : (
+              <div className="relative">
+                <textarea
+                  rows={8}
+                  readOnly
+                  value={generatedText}
+                  className="w-full p-3.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs sm:text-sm font-sans focus:outline-none leading-relaxed text-slate-800"
+                />
+              </div>
+            )}
+
+            <div className="flex items-center justify-between pt-2">
+              <span className="text-[11px] text-slate-400">
+                Created strictly from stored event details
+              </span>
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setShareTextModalEvent(null)}
+                  className="px-4 py-2 rounded-xl border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                >
+                  Close
+                </button>
+
+                <button
+                  onClick={handleCopyText}
+                  disabled={generatingText || !generatedText}
+                  className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-md transition flex items-center gap-1.5"
+                >
+                  {copiedSuccess ? (
+                    <>
+                      <Check className="w-4 h-4" />
+                      <span>Copied!</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-4 h-4" />
+                      <span>Copy to Clipboard</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Status Update Quick Modal */}
       {statusChangeModalEvent && (
         <div
@@ -313,7 +462,6 @@ export const ClubDashboard: React.FC<ClubDashboardProps> = ({
               </div>
             </div>
 
-            {/* Note requirement for Postponed / Venue Changed */}
             {(selectedNewStatus === 'Postponed' || selectedNewStatus === 'Venue Changed') && (
               <div>
                 <label className="block text-xs font-bold text-amber-900 uppercase tracking-wider mb-1">

@@ -7,8 +7,10 @@ import { EventDetailModal } from './components/EventDetailModal';
 import { EventFormModal } from './components/EventFormModal';
 import { MonthCalendarView } from './components/MonthCalendarView';
 import { MyScheduleView } from './components/MyScheduleView';
+import { AskAiView } from './components/AskAiView';
 import { ClubDashboard } from './components/ClubDashboard';
-import { AdminPortalModal } from './components/AdminPortalModal';
+import { AdminReportsModal } from './components/AdminReportsModal';
+import { TermsPrivacyModal } from './components/TermsPrivacyModal';
 import { AuthModal } from './components/AuthModal';
 import { Footer } from './components/Footer';
 import {
@@ -18,6 +20,7 @@ import {
   getBookmarkedIds,
   toggleBookmark,
   resetToSampleEvents,
+  recordEventView,
 } from './services/storageService';
 import { EventItem, EventType, QuickFilter, EventStatus } from './types';
 import {
@@ -26,19 +29,18 @@ import {
   AlertCircle,
   CheckCircle,
   PlusCircle,
-  Layers,
-  ArrowRight,
   RotateCcw,
+  Bot,
 } from 'lucide-react';
 
 function EventraMain() {
   const { currentUser, isClub, isAdmin, clubs } = useAuth();
 
   // App Navigation Tab
-  const [currentTab, setCurrentTab] = useState<'feed' | 'calendar' | 'schedule' | 'club-portal' | 'admin'>('feed');
+  const [currentTab, setCurrentTab] = useState<'feed' | 'calendar' | 'schedule' | 'ask-ai' | 'club-portal' | 'admin'>('feed');
 
   // Events & Bookmarks Data State
-  const [events, setEvents] = useState<EventItem[]>(() => getAllEvents());
+  const [events, setEvents] = useState<EventItem[]>(() => getAllEvents(true));
   const [bookmarkedIds, setBookmarkedIds] = useState<string[]>(() => getBookmarkedIds());
 
   // Filter State
@@ -59,18 +61,19 @@ function EventraMain() {
     mode: 'create',
     event: null,
   });
-  const [isAdminModalOpen, setIsAdminModalOpen] = useState(false);
+  const [isAdminReportsOpen, setIsAdminReportsOpen] = useState(false);
+  const [isTermsOpen, setIsTermsOpen] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  // Sync with custom events for cross-component / cross-tab reactivity
+  // Listen for storage events
   useEffect(() => {
     const handleEventsUpdate = (e: Event) => {
       const customEvent = e as CustomEvent<EventItem[]>;
       if (customEvent.detail) {
         setEvents(customEvent.detail);
       } else {
-        setEvents(getAllEvents());
+        setEvents(getAllEvents(true));
       }
     };
 
@@ -96,10 +99,9 @@ function EventraMain() {
     setToastMessage(msg);
     setTimeout(() => {
       setToastMessage(null);
-    }, 4000);
+    }, 3500);
   };
 
-  // Toggle Bookmark
   const handleToggleBookmark = (eventId: string) => {
     const nowBookmarked = toggleBookmark(eventId);
     setBookmarkedIds(getBookmarkedIds());
@@ -111,10 +113,14 @@ function EventraMain() {
     }
   };
 
-  // Event Mutations
+  const handleOpenDetail = (ev: EventItem) => {
+    recordEventView(ev.id);
+    setDetailModalEvent(ev);
+  };
+
   const handleSaveEvent = (savedEv: EventItem) => {
     const updated = saveEvent(savedEv);
-    setEvents(getAllEvents());
+    setEvents(getAllEvents(true));
     showToast(`✅ Successfully saved "${updated.title.slice(0, 24)}..."`);
   };
 
@@ -122,7 +128,7 @@ function EventraMain() {
     const ev = events.find(e => e.id === eventId);
     if (window.confirm(`Are you sure you want to delete "${ev?.title}"?`)) {
       deleteEvent(eventId);
-      setEvents(getAllEvents());
+      setEvents(getAllEvents(true));
       showToast(`Deleted event.`);
     }
   };
@@ -151,11 +157,10 @@ function EventraMain() {
       lastUpdated: new Date().toISOString(),
     };
     saveEvent(updated);
-    setEvents(getAllEvents());
+    setEvents(getAllEvents(true));
     showToast(`Status updated to "${newStatus}" for "${event.title.slice(0, 24)}..."`);
   };
 
-  // Filter & Sort Logic for Student Feed
   const todayStr = useMemo(() => {
     const d = new Date();
     const y = d.getFullYear();
@@ -164,15 +169,18 @@ function EventraMain() {
     return `${y}-${m}-${day}`;
   }, []);
 
+  // Filter & Sort Logic for Student Feed
   const filteredEvents = useMemo(() => {
-    let result = [...events];
+    // Hidden events never appear to students
+    let result = events.filter(e => {
+      if (isAdmin) return true;
+      return !e.hidden;
+    });
 
-    // Filter past events unless user explicitly toggles
     if (!showPastEvents) {
       result = result.filter(e => e.date >= todayStr);
     }
 
-    // Search query filter
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase().trim();
       result = result.filter(
@@ -184,12 +192,10 @@ function EventraMain() {
       );
     }
 
-    // Event type filter
     if (selectedType !== 'all') {
       result = result.filter(e => e.eventType === selectedType);
     }
 
-    // Club filter
     if (selectedClubId !== 'all') {
       result = result.filter(e => e.clubId === selectedClubId);
     }
@@ -210,38 +216,32 @@ function EventraMain() {
     } else if (quickFilter === 'prize') {
       result = result.filter(e => Boolean(e.prize && e.prize.trim()));
     } else if (quickFilter === 'free') {
-      result = result.filter(e => !e.registrationLink || e.registrationLink.includes('forms.gle') || Boolean(e.prize));
+      // Entry fee is Free
+      result = result.filter(e => !e.entryFee || e.entryFee.toLowerCase().includes('free') || e.entryFee === '0');
     }
 
-    // SORTING REQUIREMENT:
-    // "Feed sorted by date, upcoming first, past events hidden."
-    // "Cancelled events stay visible with a red 'Cancelled' badge and sort below active events."
+    // Sort: Non-cancelled first, then ascending date & time
     result.sort((a, b) => {
       const aIsCancelled = a.status === 'Cancelled';
       const bIsCancelled = b.status === 'Cancelled';
 
-      // Put non-cancelled first
       if (aIsCancelled && !bIsCancelled) return 1;
       if (!aIsCancelled && bIsCancelled) return -1;
 
-      // Then sort by date ascending
       if (a.date !== b.date) return a.date.localeCompare(b.date);
-
-      // Then start time ascending
       return a.startTime.localeCompare(b.startTime);
     });
 
     return result;
-  }, [events, showPastEvents, todayStr, searchQuery, selectedType, selectedClubId, quickFilter]);
+  }, [events, isAdmin, showPastEvents, todayStr, searchQuery, selectedType, selectedClubId, quickFilter]);
 
-  // Bookmarked events list for My Schedule tab
   const bookmarkedEvents = useMemo(() => {
-    return events.filter(e => bookmarkedIds.includes(e.id));
+    return events.filter(e => bookmarkedIds.includes(e.id) && !e.hidden);
   }, [events, bookmarkedIds]);
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col font-sans text-slate-900 selection:bg-emerald-500 selection:text-white">
-      {/* Toast Alert floating */}
+      {/* Toast Alert */}
       {toastMessage && (
         <div className="fixed bottom-6 right-6 z-50 bg-slate-900 text-white px-4 py-3 rounded-2xl shadow-2xl border border-slate-700 text-xs font-semibold flex items-center gap-2 animate-in fade-in slide-in-from-bottom-3 duration-200">
           <CheckCircle className="w-4 h-4 text-emerald-400 shrink-0" />
@@ -262,7 +262,7 @@ function EventraMain() {
           })
         }
         onOpenLoginModal={() => setIsAuthModalOpen(true)}
-        onOpenAdminModal={() => setIsAdminModalOpen(true)}
+        onOpenAdminReportsModal={() => setIsAdminReportsOpen(true)}
       />
 
       {/* Main Container */}
@@ -290,7 +290,15 @@ function EventraMain() {
                     className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white text-slate-900 font-bold text-xs shadow-md hover:bg-slate-100 transition active:scale-95"
                   >
                     <Calendar className="w-4 h-4 text-emerald-700" />
-                    <span>View Month Calendar</span>
+                    <span>View Calendar</span>
+                  </button>
+
+                  <button
+                    onClick={() => setCurrentTab('ask-ai')}
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-md transition active:scale-95"
+                  >
+                    <Bot className="w-4 h-4" />
+                    <span>Ask Campus AI</span>
                   </button>
 
                   <button
@@ -354,11 +362,11 @@ function EventraMain() {
                     event={event}
                     isBookmarked={bookmarkedIds.includes(event.id)}
                     onToggleBookmark={handleToggleBookmark}
-                    onOpenDetail={ev => setDetailModalEvent(ev)}
+                    onOpenDetail={handleOpenDetail}
                     isOwner={isClub && currentUser?.id === event.clubId}
-                    onEdit={ev => handleEditEvent(ev)}
-                    onDelete={id => handleDeleteEvent(id)}
-                    onDuplicate={ev => handleDuplicateEvent(ev)}
+                    onEdit={handleEditEvent}
+                    onDelete={handleDeleteEvent}
+                    onDuplicate={handleDuplicateEvent}
                   />
                 ))}
               </div>
@@ -380,7 +388,7 @@ function EventraMain() {
                 onClick={() => {
                   if (window.confirm('Reset all events and clubs to initial SNPSU sample dataset?')) {
                     resetToSampleEvents();
-                    setEvents(getAllEvents());
+                    setEvents(getAllEvents(true));
                     showToast('Events reset to initial university samples.');
                   }
                 }}
@@ -397,8 +405,8 @@ function EventraMain() {
         {/* VIEW 2: Month Calendar View */}
         {currentTab === 'calendar' && (
           <MonthCalendarView
-            events={events}
-            onSelectEvent={ev => setDetailModalEvent(ev)}
+            events={events.filter(e => !e.hidden)}
+            onSelectEvent={handleOpenDetail}
           />
         )}
 
@@ -407,12 +415,22 @@ function EventraMain() {
           <MyScheduleView
             bookmarkedEvents={bookmarkedEvents}
             onToggleBookmark={handleToggleBookmark}
-            onSelectEvent={ev => setDetailModalEvent(ev)}
+            onSelectEvent={handleOpenDetail}
             onBrowseFeed={() => setCurrentTab('feed')}
           />
         )}
 
-        {/* VIEW 4: Club Dashboard (My Club Events) */}
+        {/* VIEW 4: Ask AI View */}
+        {currentTab === 'ask-ai' && (
+          <AskAiView
+            events={events}
+            bookmarkedIds={bookmarkedIds}
+            onToggleBookmark={handleToggleBookmark}
+            onOpenDetail={handleOpenDetail}
+          />
+        )}
+
+        {/* VIEW 5: Club Dashboard (My Club Events) */}
         {currentTab === 'club-portal' && (
           <ClubDashboard
             events={events}
@@ -448,9 +466,15 @@ function EventraMain() {
         mode={formModalState.mode}
       />
 
-      <AdminPortalModal
-        isOpen={isAdminModalOpen}
-        onClose={() => setIsAdminModalOpen(false)}
+      <AdminReportsModal
+        isOpen={isAdminReportsOpen}
+        onClose={() => setIsAdminReportsOpen(false)}
+        onRefreshEvents={() => setEvents(getAllEvents(true))}
+      />
+
+      <TermsPrivacyModal
+        isOpen={isTermsOpen}
+        onClose={() => setIsTermsOpen(false)}
       />
 
       <AuthModal
@@ -459,7 +483,9 @@ function EventraMain() {
       />
 
       {/* University Footer */}
-      <Footer />
+      <Footer
+        onOpenTerms={() => setIsTermsOpen(true)}
+      />
     </div>
   );
 }

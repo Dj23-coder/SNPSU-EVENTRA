@@ -11,21 +11,29 @@ import {
   ExternalLink,
   Flame,
   AlertTriangle,
-  RefreshCw,
   Copy,
   Edit2,
   Trash2,
+  Heart,
+  Share2,
+  Tag,
 } from 'lucide-react';
 import { EventItem, EventType, EventStatus } from '../types';
 import {
   getGoogleCalendarUrl,
   getWhatsAppUrl,
+  getWhatsAppShareUrl,
   maskPhoneNumber,
   formatDisplayDate,
   formatTime12h,
   isClosingSoon,
   getClosingSoonText,
 } from '../services/calendarService';
+import {
+  isEventInterested,
+  toggleInterested,
+  recordCalendarClick,
+} from '../services/storageService';
 
 interface EventCardProps {
   event: EventItem;
@@ -38,20 +46,20 @@ interface EventCardProps {
   onDuplicate?: (event: EventItem) => void;
 }
 
-// Clear colors for each event type
+// Consistent readable colors per event type with clear text
 export const getEventTypeBadgeClass = (type: EventType) => {
   switch (type) {
     case 'Competition':
-      return 'bg-purple-100 text-purple-800 border-purple-200';
+      return 'bg-purple-100 text-purple-900 border-purple-300 font-bold';
     case 'Workshop':
-      return 'bg-blue-100 text-blue-800 border-blue-200';
+      return 'bg-blue-100 text-blue-900 border-blue-300 font-bold';
     case 'Fest':
-      return 'bg-rose-100 text-rose-800 border-rose-200';
+      return 'bg-rose-100 text-rose-900 border-rose-300 font-bold';
     case 'Talk':
-      return 'bg-amber-100 text-amber-900 border-amber-200';
+      return 'bg-amber-100 text-amber-950 border-amber-300 font-bold';
     case 'Other':
     default:
-      return 'bg-emerald-100 text-emerald-800 border-emerald-200';
+      return 'bg-emerald-100 text-emerald-900 border-emerald-300 font-bold';
   }
 };
 
@@ -60,22 +68,22 @@ export const getStatusBadgeConfig = (status: EventStatus) => {
     case 'Cancelled':
       return {
         label: 'Cancelled',
-        bg: 'bg-red-500 text-white',
+        bg: 'bg-red-600 text-white font-extrabold',
         border: 'border-red-600',
         cardBorder: 'border-red-300 bg-red-50/20',
       };
     case 'Postponed':
       return {
         label: 'Postponed',
-        bg: 'bg-orange-500 text-white',
-        border: 'border-orange-600',
+        bg: 'bg-orange-500 text-white font-bold',
+        border: 'border-orange-500',
         cardBorder: 'border-orange-300 bg-orange-50/20',
       };
     case 'Venue Changed':
       return {
         label: 'Venue Changed',
         bg: 'bg-amber-400 text-amber-950 font-bold',
-        border: 'border-amber-500',
+        border: 'border-amber-400',
         cardBorder: 'border-amber-300 bg-amber-50/20',
       };
     case 'Scheduled':
@@ -94,24 +102,39 @@ export const EventCard: React.FC<EventCardProps> = ({
   onDelete,
   onDuplicate,
 }) => {
+  const [interested, setInterested] = React.useState(() => isEventInterested(event.id));
+  const [interestedCount, setInterestedCount] = React.useState(event.interestedCount || 0);
+
   const statusConfig = getStatusBadgeConfig(event.status);
   const closingSoon = isClosingSoon(event);
   const googleCalUrl = getGoogleCalendarUrl(event);
   const whatsAppUrl = getWhatsAppUrl(event);
+  const shareWhatsAppUrl = getWhatsAppShareUrl(event);
 
   const formattedDate = formatDisplayDate(event.date);
   const timeRange = `${formatTime12h(event.startTime)} - ${formatTime12h(event.endTime)}`;
 
+  const handleInterestedToggle = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const result = toggleInterested(event.id);
+    setInterested(result.isInterested);
+    setInterestedCount(result.newCount);
+  };
+
+  const handleCalendarClick = () => {
+    recordCalendarClick(event.id);
+  };
+
   return (
     <article
-      className={`group relative rounded-2xl bg-white border transition-all duration-200 shadow-xs hover:shadow-md flex flex-col justify-between overflow-hidden ${
+      className={`group relative rounded-2xl bg-white border transition-all duration-200 shadow-2xs hover:shadow-md flex flex-col justify-between overflow-hidden ${
         statusConfig ? statusConfig.cardBorder : 'border-slate-200 hover:border-emerald-300'
       } ${event.status === 'Cancelled' ? 'opacity-85' : ''}`}
     >
       {/* Top Banner / Poster Thumbnail */}
       <div
         onClick={() => onOpenDetail(event)}
-        className="cursor-pointer relative h-40 sm:h-44 w-full bg-gradient-to-br from-slate-100 via-slate-50 to-slate-200 overflow-hidden"
+        className="cursor-pointer relative h-40 sm:h-44 w-full bg-gradient-to-br from-slate-100 via-slate-50 to-slate-200 overflow-hidden select-none"
       >
         {event.posterUrl ? (
           <img
@@ -120,13 +143,11 @@ export const EventCard: React.FC<EventCardProps> = ({
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
             loading="lazy"
             onError={e => {
-              // Fallback to placeholder if broken image
               (e.target as HTMLElement).style.display = 'none';
             }}
           />
         ) : (
-          /* Clean themed graphic placeholder */
-          <div className="w-full h-full flex flex-col items-center justify-center p-4 text-center bg-gradient-to-tr from-emerald-900/10 via-teal-900/5 to-slate-900/10">
+          <div className="w-full h-full flex flex-col items-center justify-center p-4 text-center bg-gradient-to-tr from-emerald-950/10 via-teal-900/5 to-slate-900/10">
             <div className="w-12 h-12 rounded-xl bg-white shadow-xs border border-slate-200 flex items-center justify-center text-emerald-700 font-bold text-lg mb-2">
               {event.eventType.slice(0, 1)}
             </div>
@@ -136,30 +157,31 @@ export const EventCard: React.FC<EventCardProps> = ({
         )}
 
         {/* Gradient Overlay for badges contrast */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/20 pointer-events-none" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/25 pointer-events-none" />
 
         {/* Top Badges (Left & Right) */}
         <div className="absolute top-2.5 left-2.5 right-2.5 flex items-start justify-between gap-1.5 pointer-events-none">
-          {/* Event Type & Status Badges */}
           <div className="flex flex-wrap gap-1.5 items-center">
+            {/* Type badge with readable text and color */}
             <span
-              className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold border shadow-xs ${getEventTypeBadgeClass(
+              className={`px-2.5 py-0.5 rounded-full text-[11px] border shadow-2xs ${getEventTypeBadgeClass(
                 event.eventType
               )}`}
             >
               {event.eventType}
             </span>
 
+            {/* Status badge with text */}
             {statusConfig && (
               <span
-                className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold shadow-xs ${statusConfig.bg}`}
+                className={`px-2.5 py-0.5 rounded-full text-[11px] shadow-2xs ${statusConfig.bg}`}
               >
                 {statusConfig.label}
               </span>
             )}
           </div>
 
-          {/* Bookmark Button (Clickable) */}
+          {/* Bookmark Button */}
           <button
             onClick={e => {
               e.stopPropagation();
@@ -168,7 +190,7 @@ export const EventCard: React.FC<EventCardProps> = ({
             className={`pointer-events-auto p-2 rounded-full transition shadow-md active:scale-90 ${
               isBookmarked
                 ? 'bg-amber-400 text-slate-900 hover:bg-amber-300'
-                : 'bg-white/90 text-slate-700 hover:bg-white hover:text-amber-500'
+                : 'bg-white/95 text-slate-700 hover:bg-white hover:text-amber-500'
             }`}
             title={isBookmarked ? 'Remove from My Schedule' : 'Add to My Schedule'}
             aria-label="Bookmark event"
@@ -177,7 +199,7 @@ export const EventCard: React.FC<EventCardProps> = ({
           </button>
         </div>
 
-        {/* Bottom floating quick chips over image */}
+        {/* Floating chips over image */}
         <div className="absolute bottom-2.5 left-2.5 right-2.5 flex items-center justify-between text-white text-xs">
           <div className="flex items-center gap-1.5 font-medium drop-shadow-md">
             <Calendar className="w-3.5 h-3.5 text-emerald-300" />
@@ -197,22 +219,36 @@ export const EventCard: React.FC<EventCardProps> = ({
       <div className="p-4 sm:p-5 flex-1 flex flex-col justify-between">
         <div>
           {/* Organizer Club Header with Verified checkmark */}
-          <div className="flex items-center gap-1.5 text-xs text-slate-600 mb-1.5">
-            <span className="font-semibold text-slate-800 hover:text-emerald-700 transition">
-              {event.clubName}
-            </span>
-            {event.isClubVerified && (
-              <span
-                className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded-full bg-blue-50 text-blue-700 text-[10px] font-semibold border border-blue-200"
-                title="Verified University Club"
-              >
-                <ShieldCheck className="w-3 h-3 text-blue-600" />
-                <span>Verified</span>
+          <div className="flex items-center justify-between gap-2 text-xs text-slate-600 mb-1.5">
+            <div className="flex items-center gap-1.5 truncate">
+              <span className="font-semibold text-slate-800 hover:text-emerald-700 transition truncate">
+                {event.clubName}
               </span>
-            )}
+              {event.isClubVerified && (
+                <span
+                  className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded-full bg-blue-50 text-blue-700 text-[10px] font-semibold border border-blue-200 shrink-0"
+                  title="Verified University Club"
+                >
+                  <ShieldCheck className="w-3 h-3 text-blue-600" />
+                  <span>Verified</span>
+                </span>
+              )}
+            </div>
+
+            {/* Entry Fee Badge */}
+            <span
+              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold border shrink-0 ${
+                !event.entryFee || event.entryFee.toLowerCase().includes('free')
+                  ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                  : 'bg-purple-50 text-purple-800 border-purple-200'
+              }`}
+            >
+              <Tag className="w-3 h-3" />
+              <span>{event.entryFee || 'Free'}</span>
+            </span>
           </div>
 
-          {/* Title */}
+          {/* Title rendered as plain text */}
           <h3
             onClick={() => onOpenDetail(event)}
             className="cursor-pointer font-bold text-base sm:text-lg text-slate-900 leading-snug hover:text-emerald-700 transition line-clamp-2 mb-2"
@@ -220,7 +256,7 @@ export const EventCard: React.FC<EventCardProps> = ({
             {event.title}
           </h3>
 
-          {/* Short Description (max 200 chars) */}
+          {/* Short Description */}
           <p className="text-slate-600 text-xs sm:text-sm line-clamp-2 mb-3 leading-relaxed">
             {event.shortDescription}
           </p>
@@ -247,11 +283,11 @@ export const EventCard: React.FC<EventCardProps> = ({
             </div>
           )}
 
-          {/* Metadata Grid (Time, Venue) */}
+          {/* Metadata Grid (Time, Venue in IST) */}
           <div className="space-y-1.5 text-xs text-slate-600 mb-3 bg-slate-50/70 p-2.5 rounded-xl border border-slate-100">
             <div className="flex items-center gap-2">
               <Clock className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-              <span className="font-medium">{timeRange}</span>
+              <span className="font-medium">{timeRange} (IST)</span>
             </div>
             <div className="flex items-center gap-2">
               <MapPin className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
@@ -269,7 +305,7 @@ export const EventCard: React.FC<EventCardProps> = ({
             )}
 
             {event.prize && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-50 text-amber-800 text-[11px] font-semibold border border-amber-200">
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-50 text-amber-900 text-[11px] font-semibold border border-amber-200">
                 <Trophy className="w-3 h-3 text-amber-600" />
                 <span className="truncate max-w-[170px]">{event.prize}</span>
               </span>
@@ -279,21 +315,49 @@ export const EventCard: React.FC<EventCardProps> = ({
 
         {/* Action Buttons Section */}
         <div className="pt-2 border-t border-slate-100 flex flex-col gap-2">
-          {/* Student Actions */}
+          {/* Interested button + WhatsApp Share button */}
+          <div className="flex items-center justify-between gap-2 text-xs">
+            {/* Interested Button */}
+            <button
+              onClick={handleInterestedToggle}
+              className={`flex-1 py-1.5 px-3 rounded-xl border font-semibold flex items-center justify-center gap-1.5 transition active:scale-95 ${
+                interested
+                  ? 'bg-rose-50 border-rose-200 text-rose-700 font-bold'
+                  : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
+              }`}
+              title={interested ? 'Remove Interested mark' : 'Mark as Interested'}
+            >
+              <Heart className={`w-3.5 h-3.5 ${interested ? 'fill-rose-600 text-rose-600' : ''}`} />
+              <span>{interested ? 'Interested' : 'Interested?'} ({interestedCount})</span>
+            </button>
+
+            {/* WhatsApp Share Button */}
+            <a
+              href={shareWhatsAppUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="py-1.5 px-3 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 font-semibold flex items-center gap-1 transition"
+              title="Share event on WhatsApp"
+            >
+              <Share2 className="w-3.5 h-3.5 text-emerald-600" />
+              <span>Share</span>
+            </a>
+          </div>
+
+          {/* Student Actions: Google Calendar & WhatsApp Coordinator */}
           <div className="grid grid-cols-2 gap-2">
-            {/* Google Calendar Link */}
             <a
               href={googleCalUrl}
               target="_blank"
               rel="noopener noreferrer"
+              onClick={handleCalendarClick}
               className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition active:scale-95"
-              title="Add to Google Calendar"
+              title="Add to Google Calendar (IST)"
             >
               <Calendar className="w-3.5 h-3.5 text-blue-600" />
               <span>Google Cal</span>
             </a>
 
-            {/* WhatsApp Coordinator Contact Button */}
             <a
               href={whatsAppUrl}
               target="_blank"

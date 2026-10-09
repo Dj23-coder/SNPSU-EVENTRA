@@ -1,7 +1,7 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Default Deny
+    // Global Default Deny
     match /{document=**} {
       allow read, write: if false;
     }
@@ -23,11 +23,21 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    // Admin role checked directly from the trusted 'clubs' or 'admins' document
     function isAdmin() {
-      return isSignedIn() && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+      return isSignedIn() && (
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid)) ||
+        (exists(/databases/$(database)/documents/clubs/$(request.auth.uid)) &&
+         get(/databases/$(database)/documents/clubs/$(request.auth.uid)).data.admin == true)
+      );
     }
 
-    // Events validation
+    // Check if the user is the club owner of the event
+    function isEventOwner(eventData) {
+      return isSignedIn() && (eventData.clubId == request.auth.uid || eventData.ownerId == request.auth.uid);
+    }
+
+    // Validate incoming event shape
     function isValidEvent(data) {
       return data.title is string && data.title.size() <= 150 &&
              data.clubId is string && data.clubId.size() <= 100 &&
@@ -38,18 +48,60 @@ service cloud.firestore {
              data.contactWhatsApp is string && data.contactWhatsApp.size() <= 15;
     }
 
-    // Public read for students without login; Club and Admin writes
+    // EVENTS COLLECTION:
+    // Anyone can read active events. Hidden events are readable ONLY by admin or the event's owner club.
+    // Logged-in clubs can create events, and can edit/delete ONLY their own events.
+    // Only admins can modify the 'hidden' flag or edit other clubs' events.
     match /events/{eventId} {
-      allow read: if isValidId(eventId);
-      allow create: if isSignedIn() && isValidId(eventId) && isValidEvent(incoming());
-      allow update: if isSignedIn() && isValidId(eventId) && isValidEvent(incoming());
-      allow delete: if isSignedIn() && isValidId(eventId);
+      allow get: if isValidId(eventId) && (
+        resource.data.hidden != true ||
+        isAdmin() ||
+        isEventOwner(resource.data)
+      );
+
+      allow list: if resource.data.hidden != true || isAdmin();
+
+      // Only signed-in clubs can create events (and cannot set hidden: true unless admin)
+      allow create: if isSignedIn() &&
+                    isValidId(eventId) &&
+                    isValidEvent(incoming()) &&
+                    (incoming().clubId == request.auth.uid || incoming().ownerId == request.auth.uid || isAdmin()) &&
+                    (!('hidden' in incoming()) || incoming().hidden == false || isAdmin());
+
+      // Only the event owner club or an admin can update
+      // Only admins can change the 'hidden' flag
+      allow update: if isSignedIn() &&
+                    isValidId(eventId) &&
+                    isValidEvent(incoming()) &&
+                    (
+                      (isEventOwner(existing()) && !incoming().diff(existing()).affectedKeys().hasAny(['hidden'])) ||
+                      isAdmin()
+                    );
+
+      // Only event owner or admin can delete
+      allow delete: if isSignedIn() && isValidId(eventId) && (isEventOwner(existing()) || isAdmin());
+
+      // Students can increment the interestedCount counter
+      allow update: if isValidId(eventId) &&
+                    incoming().diff(existing()).affectedKeys().hasOnly(['interestedCount', 'viewsCount', 'calendarClicksCount']);
     }
 
-    // Clubs collection
-    match /clubs/{clubId} {
+    // CLUBS COLLECTION:
+    // Accounts created manually in Firebase Console by Admin.
+    // Public can read verified clubs. Only Admins can create clubs, toggle 'verified', or toggle 'admin'.
+    match/clubs/{clubId} {
       allow read: if isValidId(clubId);
-      allow write: if isAdmin() && isValidId(clubId);
+      allow create, update, delete: if isAdmin() && isValidId(clubId);
+    }
+
+    // REPORTS COLLECTION:
+    // Students can submit event reports without logging in.
+    // Only Admins can read, list, and resolve reports.
+    match /reports/{reportId} {
+      allow create: if isValidId(reportId) &&
+                    incoming().keys().hasAll(['eventId', 'eventTitle', 'reason', 'reportedAt']) &&
+                    incoming().reason in ['Fake or misleading', 'Inappropriate', 'Wrong details', 'Other'];
+      allow read, list, update, delete: if isAdmin() && isValidId(reportId);
     }
   }
 }
