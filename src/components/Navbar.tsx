@@ -218,17 +218,6 @@ export const Navbar: React.FC<NavbarProps> = ({
               </button>
             )}
 
-            {isAdmin && (
-              <button
-                onClick={onOpenAdminReportsModal}
-                className="hidden xl:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 font-semibold text-xs transition"
-                title="View student moderation flags & reported events"
-              >
-                <ShieldAlert className="w-3.5 h-3.5 text-purple-600" />
-                <span>Reports</span>
-              </button>
-            )}
-
             {currentUser ? (
               <div className="flex items-center gap-2">
                 <div className="hidden lg:flex flex-col text-right">
