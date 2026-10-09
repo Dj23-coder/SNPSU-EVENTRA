@@ -18,6 +18,7 @@ import {
   Share2,
   Tag,
   CheckCircle,
+  Users,
 } from 'lucide-react';
 import { EventItem, EventType, EventStatus } from '../types';
 import {
@@ -35,6 +36,7 @@ import {
   toggleInterested,
   recordCalendarClick,
   isUserRegisteredLocally,
+  getEventRegistrations,
 } from '../services/storageService';
 
 interface EventCardProps {
@@ -43,6 +45,7 @@ interface EventCardProps {
   onToggleBookmark: (eventId: string) => void;
   onOpenDetail: (event: EventItem) => void;
   onOpenRegister?: (event: EventItem) => void;
+  onOpenParticipants?: (event: EventItem) => void;
   isOwner?: boolean;
   onEdit?: (event: EventItem) => void;
   onDelete?: (eventId: string) => void;
@@ -101,6 +104,7 @@ export const EventCard: React.FC<EventCardProps> = ({
   onToggleBookmark,
   onOpenDetail,
   onOpenRegister,
+  onOpenParticipants,
   isOwner,
   onEdit,
   onDelete,
@@ -457,33 +461,46 @@ export const EventCard: React.FC<EventCardProps> = ({
 
           {/* Club Coordinator Management Tools (when owner) */}
           {isOwner && (
-            <div className="mt-2 pt-2 border-t border-slate-200 grid grid-cols-3 gap-1.5 bg-slate-50 p-1.5 rounded-xl">
-              <button
-                onClick={() => onEdit && onEdit(event)}
-                className="py-1 px-2 rounded-lg bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 text-[11px] font-semibold flex items-center justify-center gap-1"
-                title="Edit Event"
-              >
-                <Edit2 className="w-3 h-3 text-blue-600" />
-                <span>Edit</span>
-              </button>
+            <div className="mt-2 pt-2 border-t border-slate-200 space-y-1.5">
+              {event.registrationType === 'in_app' && (
+                <button
+                  type="button"
+                  onClick={() => onOpenParticipants && onOpenParticipants(event)}
+                  className="w-full py-1.5 px-3 rounded-xl bg-blue-50 border border-blue-200 hover:bg-blue-100 text-blue-800 text-[11px] font-bold flex items-center justify-center gap-1.5 transition active:scale-95 shadow-2xs"
+                  title="View registered student participants and download CSV"
+                >
+                  <Users className="w-3.5 h-3.5 text-blue-600" />
+                  <span>Participants ({getEventRegistrations(event.id).length})</span>
+                </button>
+              )}
+              <div className="grid grid-cols-3 gap-1.5 bg-slate-50 p-1.5 rounded-xl">
+                <button
+                  onClick={() => onEdit && onEdit(event)}
+                  className="py-1 px-2 rounded-lg bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 text-[11px] font-semibold flex items-center justify-center gap-1"
+                  title="Edit Event"
+                >
+                  <Edit2 className="w-3 h-3 text-blue-600" />
+                  <span>Edit</span>
+                </button>
 
-              <button
-                onClick={() => onDuplicate && onDuplicate(event)}
-                className="py-1 px-2 rounded-lg bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 text-[11px] font-semibold flex items-center justify-center gap-1"
-                title="Duplicate event to form"
-              >
-                <Copy className="w-3 h-3 text-purple-600" />
-                <span>Copy</span>
-              </button>
+                <button
+                  onClick={() => onDuplicate && onDuplicate(event)}
+                  className="py-1 px-2 rounded-lg bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 text-[11px] font-semibold flex items-center justify-center gap-1"
+                  title="Duplicate event to form"
+                >
+                  <Copy className="w-3 h-3 text-purple-600" />
+                  <span>Copy</span>
+                </button>
 
-              <button
-                onClick={() => onDelete && onDelete(event.id)}
-                className="py-1 px-2 rounded-lg bg-white border border-red-200 hover:bg-red-50 text-red-600 text-[11px] font-semibold flex items-center justify-center gap-1"
-                title="Delete Event"
-              >
-                <Trash2 className="w-3 h-3" />
-                <span>Delete</span>
-              </button>
+                <button
+                  onClick={() => onDelete && onDelete(event.id)}
+                  className="py-1 px-2 rounded-lg bg-white border border-red-200 hover:bg-red-50 text-red-600 text-[11px] font-semibold flex items-center justify-center gap-1"
+                  title="Delete Event"
+                >
+                  <Trash2 className="w-3 h-3" />
+                  <span>Delete</span>
+                </button>
+              </div>
             </div>
           )}
         </div>

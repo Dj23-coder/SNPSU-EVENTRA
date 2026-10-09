@@ -102,9 +102,24 @@ export const TermsPrivacyModal: React.FC<TermsPrivacyModalProps> = ({ isOpen, on
             </ul>
           </section>
 
+          <section className="space-y-1.5 p-4 rounded-2xl bg-emerald-50/70 border border-emerald-200">
+            <h4 className="font-bold text-emerald-950 text-sm sm:text-base">
+              7. Event Registration & Student Data Privacy
+            </h4>
+            <p className="text-xs sm:text-sm text-emerald-900 leading-relaxed">
+              When registering for an in-app event, student registration details (full name, USN or roll number, college email, phone number, department, and academic year) are shared exclusively with the organising club coordinator and the university administration (Student Affairs Office).
+            </p>
+            <p className="text-xs sm:text-sm text-emerald-900 leading-relaxed">
+              These details are used solely for that specific event (managing seat capacity, generating participant check-in lists, and event communication). Student data is never made public, and students cannot view other students&apos; registration details.
+            </p>
+            <p className="text-xs sm:text-sm text-emerald-900 leading-relaxed">
+              Any registered student can request the removal or deletion of their registration records at any time through our university grievance contact below.
+            </p>
+          </section>
+
           <section className="space-y-1.5">
             <h4 className="font-bold text-slate-900 text-sm sm:text-base">
-              7. How AI (Gemini) Is Used
+              8. How AI (Gemini) Is Used
             </h4>
             <p>
               Gemini AI models are used to assist club coordinators by parsing messy WhatsApp drafts and reading poster graphics to pre-fill event forms. AI output is never published automatically; coordinators must review, verify, and consent before posting. For students, the Ask AI assistant queries only verified campus events.

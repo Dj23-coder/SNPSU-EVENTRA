@@ -361,15 +361,16 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
 
               {/* Consent Checkbox */}
               <div className="pt-2">
-                <label className="flex items-start gap-2.5 cursor-pointer">
+                <label className="flex items-start gap-2.5 cursor-pointer select-none">
                   <input
                     type="checkbox"
+                    required
                     checked={consent}
                     onChange={e => setConsent(e.target.checked)}
                     className="mt-0.5 rounded border-slate-300 text-slate-900 focus:ring-slate-900"
                   />
-                  <span className="text-xs text-slate-600 leading-normal">
-                    I agree to share these details with the organising club ({event.clubName}) and university administration for event coordination.
+                  <span className="text-xs text-slate-700 font-medium leading-normal">
+                    I agree to share these details with the organising club.
                   </span>
                 </label>
               </div>
@@ -385,7 +386,8 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-lg bg-[#0F1B2D] hover:bg-[#1A2B44] text-white text-xs font-bold transition btn-press shadow-xs"
+                  disabled={!consent}
+                  className="px-5 py-2 rounded-lg bg-[#0F1B2D] hover:bg-[#1A2B44] text-white text-xs font-bold transition btn-press shadow-xs disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   Confirm Registration
                 </button>

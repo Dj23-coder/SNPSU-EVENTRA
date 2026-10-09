@@ -20,6 +20,8 @@ import {
   Tag,
   ShieldAlert,
   Building2,
+  CheckCircle,
+  Users,
 } from 'lucide-react';
 import { EventItem } from '../types';
 import {
@@ -37,6 +39,8 @@ import {
   isEventInterested,
   toggleInterested,
   recordCalendarClick,
+  isUserRegisteredLocally,
+  getEventRegistrations,
 } from '../services/storageService';
 import { getEventTypeBadgeClass, getStatusBadgeConfig } from './EventCard';
 import { ReportModal } from './ReportModal';
@@ -47,6 +51,10 @@ interface EventDetailModalProps {
   onClose: () => void;
   isBookmarked: boolean;
   onToggleBookmark: (eventId: string) => void;
+  onOpenRegister?: (event: EventItem) => void;
+  onOpenParticipants?: (event: EventItem) => void;
+  isOwner?: boolean;
+  isAdmin?: boolean;
 }
 
 export const EventDetailModal: React.FC<EventDetailModalProps> = ({
@@ -55,18 +63,37 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
   onClose,
   isBookmarked,
   onToggleBookmark,
+  onOpenRegister,
+  onOpenParticipants,
+  isOwner,
+  isAdmin,
 }) => {
   const [isReportOpen, setIsReportOpen] = useState(false);
   const [interested, setInterested] = useState(false);
   const [interestedCount, setInterestedCount] = useState(0);
+  const [isRegistered, setIsRegistered] = useState(false);
 
-  // Sync interested state when event changes
+  // Sync state when event changes
   React.useEffect(() => {
     if (event) {
       setInterested(isEventInterested(event.id));
       setInterestedCount(event.interestedCount || 0);
+      setIsRegistered(isUserRegisteredLocally(event.id));
     }
   }, [event]);
+
+  React.useEffect(() => {
+    if (!event) return;
+    const handleLocalReg = () => {
+      setIsRegistered(isUserRegisteredLocally(event.id));
+    };
+    window.addEventListener('snpsu-local-registrations-updated', handleLocalReg);
+    window.addEventListener('snpsu-registrations-updated', handleLocalReg);
+    return () => {
+      window.removeEventListener('snpsu-local-registrations-updated', handleLocalReg);
+      window.removeEventListener('snpsu-registrations-updated', handleLocalReg);
+    };
+  }, [event?.id]);
 
   if (!isOpen || !event) return null;
 
@@ -325,6 +352,16 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
                   </div>
                 )}
 
+                {event.registrationType === 'in_app' && event.maxSeats && (
+                  <div className="flex items-center gap-2">
+                    <Users className="w-4 h-4 text-blue-600" />
+                    <span className="text-slate-600">Capacity:</span>
+                    <span className="font-semibold text-slate-900">
+                      {event.maxSeats} total seats ({Math.max(0, event.maxSeats - (event.seatsBooked || 0))} seats left)
+                    </span>
+                  </div>
+                )}
+
                 {event.registrationDeadline && (
                   <div className="flex items-center gap-2">
                     <Clock className="w-4 h-4 text-red-600" />
@@ -401,30 +438,88 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
               </button>
             </div>
 
-            <div className="w-full sm:w-auto flex flex-col items-end gap-1">
-              {event.registrationLink ? (
+            <div className="w-full sm:w-auto flex flex-col sm:flex-row items-stretch sm:items-center justify-end gap-2.5">
+              {/* Coordinator & Admin Participants Button */}
+              {(isOwner || isAdmin) && event.registrationType === 'in_app' && (
+                <button
+                  type="button"
+                  onClick={() => onOpenParticipants && onOpenParticipants(event)}
+                  className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-blue-50 border border-blue-200 hover:bg-blue-100 text-blue-800 text-xs sm:text-sm font-bold transition active:scale-95 shadow-2xs"
+                  title="View registered student participants and download CSV"
+                >
+                  <Users className="w-4 h-4 text-blue-600" />
+                  <span>Participants ({getEventRegistrations(event.id).length})</span>
+                </button>
+              )}
+
+              {/* In-app registration actions */}
+              {event.registrationType === 'in_app' && (
                 <>
+                  {isRegistered ? (
+                    <div className="px-5 py-2.5 rounded-xl bg-emerald-50 border border-emerald-300 text-emerald-800 text-xs sm:text-sm font-bold flex items-center justify-center gap-2 shadow-2xs">
+                      <CheckCircle className="w-4 h-4 text-emerald-600" />
+                      <span>Registered on this device</span>
+                    </div>
+                  ) : event.status === 'Cancelled' ? (
+                    <div className="px-5 py-2.5 rounded-xl bg-slate-100 border border-slate-200 text-slate-500 text-xs sm:text-sm font-semibold flex items-center justify-center">
+                      <span>Event Cancelled</span>
+                    </div>
+                  ) : event.registrationDeadline && new Date().toISOString().split('T')[0] > event.registrationDeadline ? (
+                    <div className="px-5 py-2.5 rounded-xl bg-slate-100 border border-slate-200 text-slate-500 text-xs sm:text-sm font-semibold flex items-center justify-center">
+                      <span>Registration Closed</span>
+                    </div>
+                  ) : event.maxSeats && (event.seatsBooked || 0) >= event.maxSeats ? (
+                    <div className="px-5 py-2.5 rounded-xl bg-amber-50 border border-amber-300 text-amber-900 text-xs sm:text-sm font-bold flex items-center justify-center">
+                      <span>Registrations full</span>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => onOpenRegister && onOpenRegister(event)}
+                      className="inline-flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl bg-[#0F1B2D] hover:bg-[#1A2B44] text-white text-xs sm:text-sm font-bold shadow-md transition active:scale-95 btn-press"
+                    >
+                      <span>Register</span>
+                      {event.maxSeats && (
+                        <span className="text-xs font-semibold text-[#C59A3F] bg-white/10 px-2 py-0.5 rounded-md">
+                          {Math.max(0, event.maxSeats - (event.seatsBooked || 0))} seats left
+                        </span>
+                      )}
+                    </button>
+                  )}
+                </>
+              )}
+
+              {/* External Registration */}
+              {event.registrationType === 'external' && event.registrationLink && (
+                <div className="flex flex-col items-end gap-1">
                   <a
                     href={event.registrationLink}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold shadow-md transition active:scale-95"
+                    className="inline-flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs sm:text-sm font-bold shadow-md transition active:scale-95"
                   >
-                    <span>Register for Event</span>
+                    <span>Register (External)</span>
                     <ExternalLink className="w-4 h-4" />
                   </a>
                   <span className="text-[10px] text-slate-400">
-                    ↗ Opens an external registration site ({isHttpsLink ? 'https verified' : 'external link'})
+                    ↗ Opens external registration ({isHttpsLink ? 'https verified' : 'external link'})
                   </span>
-                </>
-              ) : (
-                <button
-                  onClick={onClose}
-                  className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-800 text-sm font-semibold transition"
-                >
-                  Close
-                </button>
+                </div>
               )}
+
+              {/* None Registration */}
+              {event.registrationType === 'none' && (
+                <span className="text-xs text-slate-500 italic px-2 py-1">
+                  Walk-in event (No registration required)
+                </span>
+              )}
+
+              <button
+                onClick={onClose}
+                className="px-4 py-2.5 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-800 text-xs sm:text-sm font-semibold transition"
+              >
+                Close
+              </button>
             </div>
           </div>
         </div>

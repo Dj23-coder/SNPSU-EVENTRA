@@ -13,6 +13,8 @@ import { ManageClubsView } from './components/ManageClubsView';
 import { AdminReportsModal } from './components/AdminReportsModal';
 import { TermsPrivacyModal } from './components/TermsPrivacyModal';
 import { AuthModal } from './components/AuthModal';
+import { RegistrationModal } from './components/RegistrationModal';
+import { ParticipantsModal } from './components/ParticipantsModal';
 import { Footer } from './components/Footer';
 import {
   getAllEvents,
@@ -60,6 +62,8 @@ function EventraMain() {
 
   // Modals State
   const [detailModalEvent, setDetailModalEvent] = useState<EventItem | null>(null);
+  const [registerModalEvent, setRegisterModalEvent] = useState<EventItem | null>(null);
+  const [participantsModalEvent, setParticipantsModalEvent] = useState<EventItem | null>(null);
   const [formModalState, setFormModalState] = useState<{
     isOpen: boolean;
     mode: 'create' | 'edit' | 'duplicate';
@@ -371,7 +375,9 @@ function EventraMain() {
                     isBookmarked={bookmarkedIds.includes(event.id)}
                     onToggleBookmark={handleToggleBookmark}
                     onOpenDetail={handleOpenDetail}
-                    isOwner={isClub && currentUser?.id === event.clubId}
+                    onOpenRegister={setRegisterModalEvent}
+                    onOpenParticipants={setParticipantsModalEvent}
+                    isOwner={isAdmin || (isClub && currentUser?.id === event.clubId)}
                     onEdit={handleEditEvent}
                     onDelete={handleDeleteEvent}
                     onDuplicate={handleDuplicateEvent}
@@ -472,6 +478,37 @@ function EventraMain() {
         onClose={() => setDetailModalEvent(null)}
         isBookmarked={detailModalEvent ? bookmarkedIds.includes(detailModalEvent.id) : false}
         onToggleBookmark={handleToggleBookmark}
+        onOpenRegister={ev => {
+          setDetailModalEvent(null);
+          setRegisterModalEvent(ev);
+        }}
+        onOpenParticipants={ev => {
+          setDetailModalEvent(null);
+          setParticipantsModalEvent(ev);
+        }}
+        isOwner={isClub && currentUser?.id === detailModalEvent?.clubId}
+        isAdmin={isAdmin}
+      />
+
+      <RegistrationModal
+        isOpen={Boolean(registerModalEvent)}
+        onClose={() => setRegisterModalEvent(null)}
+        event={registerModalEvent}
+        onRegisteredSuccess={reg => {
+          setEvents(getAllEvents(true));
+          showToast(`🎉 Seat reserved for ${reg.eventTitle}!`);
+        }}
+        onSaveToSchedule={eventId => {
+          handleToggleBookmark(eventId);
+        }}
+        isBookmarked={registerModalEvent ? bookmarkedIds.includes(registerModalEvent.id) : false}
+      />
+
+      <ParticipantsModal
+        isOpen={Boolean(participantsModalEvent)}
+        onClose={() => setParticipantsModalEvent(null)}
+        event={participantsModalEvent}
+        onNotify={showToast}
       />
 
       <EventFormModal

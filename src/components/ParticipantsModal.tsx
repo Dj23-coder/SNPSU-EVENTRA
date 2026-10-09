@@ -18,6 +18,7 @@ import {
 import { EventItem, EventRegistration } from '../types';
 import { getEventRegistrations, downloadRegistrationsCsv } from '../services/storageService';
 import { formatDisplayDate, formatTime12h } from '../services/calendarService';
+import { useAuth } from '../context/AuthContext';
 
 interface ParticipantsModalProps {
   isOpen: boolean;
@@ -32,9 +33,43 @@ export const ParticipantsModal: React.FC<ParticipantsModalProps> = ({
   event,
   onNotify,
 }) => {
+  const { currentUser, isClub, isAdmin } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
 
   if (!isOpen || !event) return null;
+
+  const isOwnerClub = isClub && currentUser?.id === event.clubId;
+  const hasAccess = isAdmin || isOwnerClub;
+
+  if (!hasAccess) {
+    return (
+      <div
+        className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/70 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150"
+        onClick={onClose}
+      >
+        <div
+          className="bg-white rounded-2xl max-w-md w-full p-6 text-center shadow-2xl border border-slate-200"
+          onClick={e => e.stopPropagation()}
+        >
+          <div className="w-12 h-12 rounded-full bg-red-100 text-red-600 flex items-center justify-center mx-auto mb-3">
+            <ShieldCheck className="w-6 h-6" />
+          </div>
+          <h4 className="font-heading font-bold text-lg text-slate-900">
+            Access Restricted
+          </h4>
+          <p className="text-xs text-slate-600 mt-2 leading-relaxed">
+            Only the organising club coordinator ({event.clubName}) and the university administrator can view or export event participant records. Students cannot view other students&apos; personal details.
+          </p>
+          <button
+            onClick={onClose}
+            className="mt-4 px-5 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-semibold transition"
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   const registrations: EventRegistration[] = getEventRegistrations(event.id);
 

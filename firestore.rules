@@ -120,26 +120,49 @@ service cloud.firestore {
       allow read, list, update, delete: if isAdmin() && isValidId(reportId);
     }
 
+    // Helper function for student registrations validation
+    function isValidRegistration(data) {
+      return data.keys().hasAll(['eventId', 'fullName', 'usn', 'email', 'phone', 'department', 'year', 'registeredAt']) &&
+             data.fullName is string && data.fullName.size() >= 2 && data.fullName.size() <= 100 &&
+             data.usn is string && data.usn.size() >= 3 && data.usn.size() <= 30 &&
+             data.email is string && data.email.size() <= 120 && data.email.matches('^[a-zA-Z0-9._%+\\-]+@[a-zA-Z0-9.\\-]+\\.[a-zA-Z]{2,}$') &&
+             data.phone is string && data.phone.matches('^[0-9]{10}$') &&
+             data.department is string && data.department.size() >= 2 && data.department.size() <= 80 &&
+             data.year is string && data.year.size() <= 40 &&
+             (!('consent' in data) || data.consent == true);
+    }
+
+    function isEventOpenForRegistration(eventId) {
+      return exists(/databases/$(database)/documents/events/$(eventId)) &&
+             get(/databases/$(database)/documents/events/$(eventId)).data.status != 'Cancelled' &&
+             get(/databases/$(database)/documents/events/$(eventId)).data.registrationType == 'in_app' &&
+             (!('hidden' in get(/databases/$(database)/documents/events/$(eventId)).data) ||
+              get(/databases/$(database)/documents/events/$(eventId)).data.hidden != true);
+    }
+
     // REGISTRATIONS COLLECTION (In-App Student Participation):
-    // Anyone can create a registration that passes validation.
-    // Only the event's owner club and the admin can read/list them.
-    // No one can edit registrations from the client.
+    // Anyone can create a registration only if it passes validation (required fields, correct types, consent true) and the event is open.
+    // Only the event's owner club and the admin can read registrations.
+    // No one can edit or delete them from the client except the admin.
+    // Students must never be able to read other students' details.
     match /registrations/{registrationId} {
       allow create: if isValidId(registrationId) &&
-                    incoming().keys().hasAll(['eventId', 'eventTitle', 'fullName', 'usn', 'email', 'phone', 'registeredAt']) &&
-                    incoming().fullName is string && incoming().fullName.size() <= 100 &&
-                    incoming().email is string && incoming().email.size() <= 120 &&
-                    incoming().usn is string && incoming().usn.size() <= 30;
+                    isValidRegistration(incoming()) &&
+                    isEventOpenForRegistration(incoming().eventId);
 
-      // Only the event owner club or admin can read participant data
-      allow read: if isAdmin() || (
+      // Only the event's owner club and the admin can read participant data
+      allow read, list: if isAdmin() || (
         isSignedIn() &&
         exists(/databases/$(database)/documents/events/$(resource.data.eventId)) &&
-        get(/databases/$(database)/documents/events/$(resource.data.eventId)).data.clubId == request.auth.uid
+        (get(/databases/$(database)/documents/events/$(resource.data.eventId)).data.clubId == request.auth.uid ||
+         get(/databases/$(database)/documents/events/$(resource.data.eventId)).data.ownerId == request.auth.uid)
       );
 
-      allow update: if false; // Immutable registrations
-      allow delete: if isAdmin();
+      // No one can edit registrations from the client
+      allow update: if false;
+
+      // No one can delete from the client except the admin
+      allow delete: if isAdmin() && isValidId(registrationId);
     }
   }
 }
