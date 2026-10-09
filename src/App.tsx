@@ -9,6 +9,7 @@ import { MonthCalendarView } from './components/MonthCalendarView';
 import { MyScheduleView } from './components/MyScheduleView';
 import { AskAiView } from './components/AskAiView';
 import { ClubDashboard } from './components/ClubDashboard';
+import { ManageClubsView } from './components/ManageClubsView';
 import { AdminReportsModal } from './components/AdminReportsModal';
 import { TermsPrivacyModal } from './components/TermsPrivacyModal';
 import { AuthModal } from './components/AuthModal';
@@ -37,7 +38,14 @@ function EventraMain() {
   const { currentUser, isClub, isAdmin, clubs } = useAuth();
 
   // App Navigation Tab
-  const [currentTab, setCurrentTab] = useState<'feed' | 'calendar' | 'schedule' | 'ask-ai' | 'club-portal' | 'admin'>('feed');
+  const [currentTab, setCurrentTab] = useState<'feed' | 'calendar' | 'schedule' | 'ask-ai' | 'club-portal' | 'manage-clubs' | 'admin'>('feed');
+
+  // Guard: Non-admin users must never be able to open manage-clubs
+  useEffect(() => {
+    if (!isAdmin && currentTab === 'manage-clubs') {
+      setCurrentTab('feed');
+    }
+  }, [isAdmin, currentTab]);
 
   // Events & Bookmarks Data State
   const [events, setEvents] = useState<EventItem[]>(() => getAllEvents(true));
@@ -445,6 +453,14 @@ function EventraMain() {
             onDuplicateEvent={handleDuplicateEvent}
             onDeleteEvent={handleDeleteEvent}
             onUpdateStatus={handleUpdateStatus}
+          />
+        )}
+
+        {/* VIEW 6: Manage Clubs View (Admin Only) */}
+        {currentTab === 'manage-clubs' && isAdmin && (
+          <ManageClubsView
+            onNotify={showToast}
+            onOpenReportsModal={() => setIsAdminReportsOpen(true)}
           />
         )}
       </main>

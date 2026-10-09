@@ -19,6 +19,7 @@ import {
   Heart,
   Tag,
   ShieldAlert,
+  Building2,
 } from 'lucide-react';
 import { EventItem } from '../types';
 import {
@@ -209,8 +210,8 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
             {/* Organizer Club Banner */}
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <div className="flex items-center gap-2">
-                <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-800 flex items-center justify-center font-bold text-sm">
-                  🏛️
+                <div className="w-9 h-9 rounded-xl bg-slate-100 text-slate-800 flex items-center justify-center font-bold text-sm">
+                  <Building2 className="w-5 h-5 text-slate-700" />
                 </div>
                 <div>
                   <div className="flex items-center gap-1.5">

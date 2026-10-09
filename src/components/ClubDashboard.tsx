@@ -113,8 +113,25 @@ export const ClubDashboard: React.FC<ClubDashboardProps> = ({
     setTimeout(() => setCopiedSuccess(false), 2000);
   };
 
+  const isSuspended = currentUser?.active === false;
+
   return (
     <div className="space-y-6">
+      {/* Suspended Club Notice (Section 5) */}
+      {isSuspended && (
+        <div className="p-4 sm:p-5 rounded-3xl bg-rose-50 border border-rose-300 text-rose-900 shadow-xs flex items-center gap-3.5">
+          <AlertTriangle className="w-6 h-6 text-rose-600 shrink-0" />
+          <div>
+            <h4 className="font-extrabold text-sm sm:text-base text-rose-900">
+              Your club access is paused. Contact the Student Affairs Office.
+            </h4>
+            <p className="text-xs text-rose-700 mt-0.5">
+              Publishing, editing, and deleting events are disabled while access is paused. Your current events are hidden from students.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Club Profile & Actions Banner */}
       <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
         <div className="flex items-center gap-4">
@@ -144,7 +161,8 @@ export const ClubDashboard: React.FC<ClubDashboardProps> = ({
 
         <button
           onClick={onOpenNewEventModal}
-          className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm shadow-md transition active:scale-95"
+          disabled={isSuspended}
+          className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm shadow-md transition active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <PlusCircle className="w-5 h-5" />
           <span>Publish New Event</span>
@@ -295,8 +313,9 @@ export const ClubDashboard: React.FC<ClubDashboardProps> = ({
                     {/* Status Changer Button */}
                     <button
                       onClick={() => handleOpenStatusModal(event)}
-                      className="px-3 py-1.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-semibold transition"
-                      title="Update event status"
+                      disabled={isSuspended}
+                      className="px-3 py-1.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-semibold transition disabled:opacity-40 disabled:cursor-not-allowed"
+                      title={isSuspended ? 'Access paused' : 'Update event status'}
                     >
                       Status: <strong>{event.status}</strong>
                     </button>
@@ -304,7 +323,9 @@ export const ClubDashboard: React.FC<ClubDashboardProps> = ({
                     {/* Edit */}
                     <button
                       onClick={() => onEditEvent(event)}
-                      className="px-3 py-1.5 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-semibold border border-blue-200 flex items-center gap-1 transition"
+                      disabled={isSuspended}
+                      className="px-3 py-1.5 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-semibold border border-blue-200 flex items-center gap-1 transition disabled:opacity-40 disabled:cursor-not-allowed"
+                      title={isSuspended ? 'Access paused' : 'Edit event'}
                     >
                       <Edit className="w-3.5 h-3.5" />
                       <span>Edit</span>
@@ -313,8 +334,9 @@ export const ClubDashboard: React.FC<ClubDashboardProps> = ({
                     {/* Duplicate */}
                     <button
                       onClick={() => onDuplicateEvent(event)}
-                      className="px-3 py-1.5 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-700 text-xs font-semibold border border-purple-200 flex items-center gap-1 transition"
-                      title="Duplicate event to new form"
+                      disabled={isSuspended}
+                      className="px-3 py-1.5 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-700 text-xs font-semibold border border-purple-200 flex items-center gap-1 transition disabled:opacity-40 disabled:cursor-not-allowed"
+                      title={isSuspended ? 'Access paused' : 'Duplicate event to new form'}
                     >
                       <Copy className="w-3.5 h-3.5" />
                       <span>Duplicate</span>
@@ -323,8 +345,9 @@ export const ClubDashboard: React.FC<ClubDashboardProps> = ({
                     {/* Delete */}
                     <button
                       onClick={() => onDeleteEvent(event.id)}
-                      className="p-2 rounded-xl hover:bg-red-50 text-slate-400 hover:text-red-600 transition"
-                      title="Delete event"
+                      disabled={isSuspended}
+                      className="p-2 rounded-xl hover:bg-red-50 text-slate-400 hover:text-red-600 transition disabled:opacity-40 disabled:cursor-not-allowed"
+                      title={isSuspended ? 'Access paused' : 'Delete event'}
                       aria-label="Delete event"
                     >
                       <Trash2 className="w-4 h-4" />

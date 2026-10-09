@@ -1,6 +1,19 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { ClubUser } from '../types';
-import { getAllClubs, addClub, toggleClubVerified } from '../services/storageService';
+import { ClubUser, ClubAccessRequest } from '../types';
+import {
+  getAllClubs,
+  addClub,
+  updateClub,
+  toggleClubVerified,
+  toggleClubActive,
+  getAllAccessRequests,
+  saveAccessRequest,
+  updateAccessRequestStatus,
+} from '../services/storageService';
+import {
+  createClubWithSecondaryFirebaseApp,
+  sendClubPasswordReset,
+} from '../services/firebaseService';
 import { ADMIN_USER } from '../data/sampleData';
 
 interface AuthContextType {
@@ -9,18 +22,25 @@ interface AuthContextType {
   isClub: boolean;
   isStudent: boolean;
   clubs: ClubUser[];
+  accessRequests: ClubAccessRequest[];
   login: (email: string, password?: string) => Promise<{ success: boolean; message?: string }>;
   logout: () => void;
-  quickLoginAs: (clubIdOrAdmin: string) => void;
+  quickLoginAs: (clubIdOrAdmin: string) => { success: boolean; message?: string };
   createClub: (data: {
     name: string;
     email: string;
-    category: string;
+    category?: string;
     coordinatorName: string;
-    contactPhone: string;
+    contactPhone?: string;
+    logoUrl?: string;
     isVerified?: boolean;
-  }) => ClubUser;
+  }) => Promise<{ success: boolean; club?: ClubUser; message: string }>;
+  updateClubDetails: (clubId: string, updates: Partial<ClubUser>) => ClubUser | null;
   toggleVerifiedStatus: (clubId: string) => void;
+  toggleActiveStatus: (clubId: string) => { success: boolean; active: boolean; message: string };
+  resetPasswordForClub: (clubId: string) => Promise<{ success: boolean; message: string }>;
+  submitAccessRequest: (req: Omit<ClubAccessRequest, 'id' | 'status' | 'requestedAt'>) => void;
+  handleAccessRequest: (requestId: string, action: 'approved' | 'rejected') => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -38,10 +58,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   });
 
   const [clubs, setClubs] = useState<ClubUser[]>(() => getAllClubs());
+  const [accessRequests, setAccessRequests] = useState<ClubAccessRequest[]>(() => getAllAccessRequests());
 
   const refreshClubs = () => {
     setClubs(getAllClubs());
   };
+
+  const refreshRequests = () => {
+    setAccessRequests(getAllAccessRequests());
+  };
+
+  useEffect(() => {
+    const handleClubsUpdate = () => refreshClubs();
+    const handleRequestsUpdate = () => refreshRequests();
+
+    window.addEventListener('snpsu-clubs-updated', handleClubsUpdate);
+    window.addEventListener('snpsu-requests-updated', handleRequestsUpdate);
+
+    return () => {
+      window.removeEventListener('snpsu-clubs-updated', handleClubsUpdate);
+      window.removeEventListener('snpsu-requests-updated', handleRequestsUpdate);
+    };
+  }, []);
 
   useEffect(() => {
     try {
@@ -69,6 +107,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const foundClub = currentClubs.find(c => c.email.toLowerCase() === cleanEmail);
 
     if (foundClub) {
+      // SUSPENDED CLUB CHECK (SECTION 5)
+      if (foundClub.active === false) {
+        return {
+          success: false,
+          message: 'Your club access is paused. Contact the Student Affairs Office.',
+        };
+      }
       setCurrentUser(foundClub);
       return { success: true };
     }
@@ -83,46 +128,133 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setCurrentUser(null);
   };
 
-  const quickLoginAs = (id: string) => {
+  const quickLoginAs = (id: string): { success: boolean; message?: string } => {
     if (id === 'admin') {
       setCurrentUser(ADMIN_USER);
-      return;
+      return { success: true };
     }
     const currentClubs = getAllClubs();
     const found = currentClubs.find(c => c.id === id);
     if (found) {
+      if (found.active === false) {
+        return {
+          success: false,
+          message: 'Your club access is paused. Contact the Student Affairs Office.',
+        };
+      }
       setCurrentUser(found);
+      return { success: true };
     }
+    return { success: false, message: 'Club not found.' };
   };
 
-  const createClub = (data: {
+  const createClub = async (data: {
     name: string;
     email: string;
-    category: string;
+    category?: string;
     coordinatorName: string;
-    contactPhone: string;
+    contactPhone?: string;
+    logoUrl?: string;
     isVerified?: boolean;
-  }): ClubUser => {
-    const newClub = addClub({
-      name: data.name,
-      email: data.email,
-      category: data.category,
-      isVerified: data.isVerified ?? true,
-      role: 'club',
-      coordinatorName: data.coordinatorName,
+  }): Promise<{ success: boolean; club?: ClubUser; message: string }> => {
+    const cleanEmail = data.email.trim().toLowerCase();
+    const cleanName = data.name.trim();
+
+    // Block duplicate email or name
+    const currentClubs = getAllClubs();
+    if (currentClubs.some(c => c.email.toLowerCase() === cleanEmail)) {
+      return { success: false, message: `A club account with email ${cleanEmail} already exists.` };
+    }
+    if (currentClubs.some(c => c.name.toLowerCase() === cleanName.toLowerCase())) {
+      return { success: false, message: `A club named "${cleanName}" already exists.` };
+    }
+
+    // Safe secondary Firebase Authentication initialization
+    const firebaseRes = await createClubWithSecondaryFirebaseApp({
+      name: cleanName,
+      coordinatorName: data.coordinatorName.trim(),
+      email: cleanEmail,
+      isVerified: data.isVerified ?? false,
+      category: data.category || 'Technical',
       contactPhone: data.contactPhone,
+      logoUrl: data.logoUrl,
+      createdBy: currentUser?.id || 'admin-snpsu',
     });
+
+    // Save authoritative record in storage
+    const newClub = addClub({
+      name: cleanName,
+      email: cleanEmail,
+      category: data.category || 'Technical',
+      isVerified: data.isVerified ?? false,
+      coordinatorName: data.coordinatorName.trim(),
+      contactPhone: data.contactPhone || '',
+      logoUrl: data.logoUrl,
+    });
+
     refreshClubs();
-    return newClub;
+    return {
+      success: true,
+      club: newClub,
+      message: firebaseRes.message || `Club ${cleanName} created! Password reset instructions dispatched.`,
+    };
+  };
+
+  const updateClubDetails = (clubId: string, updates: Partial<ClubUser>): ClubUser | null => {
+    const res = updateClub(clubId, updates);
+    refreshClubs();
+    if (currentUser?.id === clubId && res) {
+      setCurrentUser(res);
+    }
+    return res;
   };
 
   const toggleVerifiedStatus = (clubId: string) => {
-    toggleClubVerified(clubId);
+    const updated = toggleClubVerified(clubId);
     refreshClubs();
-    // If the current logged-in club is toggled, update session too
-    if (currentUser && currentUser.id === clubId) {
-      setCurrentUser(prev => prev ? { ...prev, isVerified: !prev.isVerified } : null);
+    if (currentUser && currentUser.id === clubId && updated) {
+      setCurrentUser(updated);
     }
+  };
+
+  const toggleActiveStatus = (clubId: string): { success: boolean; active: boolean; message: string } => {
+    const updated = toggleClubActive(clubId);
+    refreshClubs();
+    if (currentUser && currentUser.id === clubId) {
+      if (updated && !updated.active) {
+        // Log out suspended club if currently logged in
+        setCurrentUser(null);
+      } else if (updated) {
+        setCurrentUser(updated);
+      }
+    }
+    const isActive = Boolean(updated?.active);
+    return {
+      success: true,
+      active: isActive,
+      message: isActive
+        ? 'Club reactivated. Events are now visible to students.'
+        : 'Club suspended. Events hidden from students and coordinator access paused.',
+    };
+  };
+
+  const resetPasswordForClub = async (clubId: string): Promise<{ success: boolean; message: string }> => {
+    const currentClubs = getAllClubs();
+    const club = currentClubs.find(c => c.id === clubId);
+    if (!club) {
+      return { success: false, message: 'Club not found.' };
+    }
+    return sendClubPasswordReset(club.email);
+  };
+
+  const submitAccessRequest = (req: Omit<ClubAccessRequest, 'id' | 'status' | 'requestedAt'>) => {
+    saveAccessRequest(req);
+    refreshRequests();
+  };
+
+  const handleAccessRequest = (requestId: string, action: 'approved' | 'rejected') => {
+    updateAccessRequestStatus(requestId, action);
+    refreshRequests();
   };
 
   const isAdmin = currentUser?.role === 'admin';
@@ -137,11 +269,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isClub,
         isStudent,
         clubs,
+        accessRequests,
         login,
         logout,
         quickLoginAs,
         createClub,
+        updateClubDetails,
         toggleVerifiedStatus,
+        toggleActiveStatus,
+        resetPasswordForClub,
+        submitAccessRequest,
+        handleAccessRequest,
       }}
     >
       {children}
@@ -156,3 +294,4 @@ export const useAuth = () => {
   }
   return context;
 };
+

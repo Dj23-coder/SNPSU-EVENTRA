@@ -1115,8 +1115,8 @@ export const EventFormModal: React.FC<EventFormModalProps> = ({
                     </div>
                   </div>
 
-                  <p className="text-[11px] text-emerald-800 font-medium">
-                    📌 <strong>Note:</strong> Use the official club coordinator number. Never displayed in plain text on cards; masked as +91 98450 ••••• for student inquiries.
+                  <p className="text-[11px] text-slate-700 font-medium">
+                    <span className="font-semibold text-slate-900">Note:</span> Use the official club coordinator number. Never displayed in plain text on cards; masked as +91 98450 ••••• for student inquiries.
                   </p>
                 </div>
 

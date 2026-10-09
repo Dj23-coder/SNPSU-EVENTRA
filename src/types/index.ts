@@ -2,6 +2,8 @@ export type EventType = 'Competition' | 'Workshop' | 'Fest' | 'Talk' | 'Other';
 
 export type EventStatus = 'Scheduled' | 'Cancelled' | 'Postponed' | 'Venue Changed';
 
+export type RegistrationType = 'none' | 'external' | 'in_app';
+
 export interface EventItem {
   id: string;
   title: string;
@@ -17,14 +19,17 @@ export interface EventItem {
   entryFee?: string; // 'Free', '₹50', '₹100', etc.
   certificateProvided: boolean;
   prize?: string; // e.g. "Cash prize ₹5,000"
-  registrationLink?: string;
+  registrationType?: RegistrationType; // 'none' | 'external' | 'in_app'
+  registrationLink?: string; // Used when registrationType === 'external'
   registrationDeadline?: string; // YYYY-MM-DD
+  maxSeats?: number; // Optional limit for in_app registrations
+  seatsBooked?: number; // Current count of confirmed in-app participants
   posterUrl?: string;
   contactName: string;
   contactWhatsApp: string; // 10-digit Indian number
   status: EventStatus;
   statusNote?: string; // Required when Postponed or Venue Changed
-  hidden?: boolean; // Hidden by admin moderation
+  hidden?: boolean; // Hidden by admin moderation or club suspension
   interestedCount?: number;
   viewsCount?: number;
   calendarClicksCount?: number;
@@ -41,6 +46,22 @@ export interface ClubUser {
   role: 'club' | 'admin';
   coordinatorName?: string;
   contactPhone?: string;
+  logoUrl?: string;
+  active: boolean; // false = Suspended by Admin
+  createdAt?: string; // ISO string
+  createdBy?: string;
+}
+
+export interface ClubAccessRequest {
+  id: string;
+  clubName: string;
+  coordinatorName: string;
+  email: string;
+  phone: string;
+  category: string;
+  reason?: string;
+  status: 'pending' | 'approved' | 'rejected';
+  requestedAt: string; // ISO string
 }
 
 export type QuickFilter = 'all' | 'today' | 'this_week' | 'free' | 'certificate' | 'prize';
@@ -65,6 +86,20 @@ export interface ReportItem {
   note?: string;
   reportedAt: string; // ISO
   resolved?: boolean;
+}
+
+export interface EventRegistration {
+  id: string;
+  eventId: string;
+  eventTitle: string;
+  clubId: string;
+  fullName: string;
+  usn: string; // University Seat Number or Roll Number
+  email: string;
+  phone: string;
+  department: string;
+  year: string;
+  registeredAt: string; // ISO
 }
 
 export interface ExtractedEventData {

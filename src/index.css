@@ -1,1 +1,54 @@
 @import "tailwindcss";
+
+@layer base {
+  :root {
+    --font-serif: 'Source Serif 4', Georgia, serif;
+    --font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  }
+
+  body {
+    font-family: var(--font-sans);
+    color: #0F172A;
+    background-color: #F8FAFC;
+    font-size: 16px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  h1, h2, h3, .font-heading {
+    font-family: var(--font-serif);
+    letter-spacing: -0.015em;
+  }
+
+  button, input, select, textarea {
+    font-family: var(--font-sans);
+  }
+}
+
+/* Accessible focus visible outlines */
+:focus-visible {
+  outline: 2px solid #0F1B2D;
+  outline-offset: 2px;
+}
+
+/* Primary University Palette Utilities */
+.bg-navy-950 { background-color: #0A121E; }
+.bg-navy-900 { background-color: #0F1B2D; }
+.bg-navy-800 { background-color: #1A2B44; }
+.text-navy-900 { color: #0F1B2D; }
+.text-navy-800 { color: #1A2B44; }
+
+/* Warm Gold Accent Utilities */
+.bg-gold-accent { background-color: #C59A3F; }
+.bg-gold-accent:hover { background-color: #B28832; }
+.bg-gold-light { background-color: #FDF8EC; }
+.border-gold-accent { border-color: #C59A3F; }
+.border-gold-light { border-color: #EED9A8; }
+.text-gold-accent { color: #C59A3F; }
+.text-gold-dark { color: #8A6419; }
+
+/* Tactile button presses without rubber-banding */
+.btn-press:active {
+  transform: translateY(1px);
+}

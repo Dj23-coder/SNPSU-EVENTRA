@@ -23,7 +23,6 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    // Admin role checked directly from the trusted 'clubs' or 'admins' document
     function isAdmin() {
       return isSignedIn() && (
         exists(/databases/$(database)/documents/admins/$(request.auth.uid)) ||
@@ -32,12 +31,15 @@ service cloud.firestore {
       );
     }
 
-    // Check if the user is the club owner of the event
+    function isClubActive(clubUid) {
+      return exists(/databases/$(database)/documents/clubs/$(clubUid)) &&
+             get(/databases/$(database)/documents/clubs/$(clubUid)).data.active == true;
+    }
+
     function isEventOwner(eventData) {
       return isSignedIn() && (eventData.clubId == request.auth.uid || eventData.ownerId == request.auth.uid);
     }
 
-    // Validate incoming event shape
     function isValidEvent(data) {
       return data.title is string && data.title.size() <= 150 &&
              data.clubId is string && data.clubId.size() <= 100 &&
@@ -49,9 +51,7 @@ service cloud.firestore {
     }
 
     // EVENTS COLLECTION:
-    // Anyone can read active events. Hidden events are readable ONLY by admin or the event's owner club.
-    // Logged-in clubs can create events, and can edit/delete ONLY their own events.
-    // Only admins can modify the 'hidden' flag or edit other clubs' events.
+    // Anyone can read active events. Hidden events are readable ONLY by admin or owner.
     match /events/{eventId} {
       allow get: if isValidId(eventId) && (
         resource.data.hidden != true ||
@@ -61,36 +61,52 @@ service cloud.firestore {
 
       allow list: if resource.data.hidden != true || isAdmin();
 
-      // Only signed-in clubs can create events (and cannot set hidden: true unless admin)
+      // Only signed-in ACTIVE clubs can create events (where ownerId or clubId equals auth.uid)
       allow create: if isSignedIn() &&
                     isValidId(eventId) &&
                     isValidEvent(incoming()) &&
-                    (incoming().clubId == request.auth.uid || incoming().ownerId == request.auth.uid || isAdmin()) &&
+                    (
+                      ((incoming().clubId == request.auth.uid || incoming().ownerId == request.auth.uid) && isClubActive(request.auth.uid)) ||
+                      isAdmin()
+                    ) &&
                     (!('hidden' in incoming()) || incoming().hidden == false || isAdmin());
 
-      // Only the event owner club or an admin can update
-      // Only admins can change the 'hidden' flag
+      // Only owner active club or admin can update; only admins can modify 'hidden' flag
       allow update: if isSignedIn() &&
                     isValidId(eventId) &&
                     isValidEvent(incoming()) &&
                     (
-                      (isEventOwner(existing()) && !incoming().diff(existing()).affectedKeys().hasAny(['hidden'])) ||
+                      (isEventOwner(existing()) && isClubActive(request.auth.uid) && !incoming().diff(existing()).affectedKeys().hasAny(['hidden'])) ||
                       isAdmin()
                     );
 
-      // Only event owner or admin can delete
-      allow delete: if isSignedIn() && isValidId(eventId) && (isEventOwner(existing()) || isAdmin());
+      // Only owner active club or admin can delete
+      allow delete: if isSignedIn() && isValidId(eventId) && (
+        (isEventOwner(existing()) && isClubActive(request.auth.uid)) ||
+        isAdmin()
+      );
 
-      // Students can increment the interestedCount counter
+      // Public engagement counters increment
       allow update: if isValidId(eventId) &&
-                    incoming().diff(existing()).affectedKeys().hasOnly(['interestedCount', 'viewsCount', 'calendarClicksCount']);
+                    incoming().diff(existing()).affectedKeys().hasOnly(['interestedCount', 'viewsCount', 'calendarClicksCount', 'seatsBooked']);
     }
 
     // CLUBS COLLECTION:
-    // Accounts created manually in Firebase Console by Admin.
-    // Public can read verified clubs. Only Admins can create clubs, toggle 'verified', or toggle 'admin'.
-    match/clubs/{clubId} {
-      allow read: if isValidId(clubId);
+    // Only the admin can create or update club records and the verified and active flags.
+    // A club can read only its own record.
+    // Students can read only the public fields needed for the Verified badge (club metadata if active).
+    match /clubs/{clubId} {
+      // Club reads only its own record; admin reads all; students can read active club public metadata
+      allow get: if isValidId(clubId) && (
+        isAdmin() ||
+        (isSignedIn() && request.auth.uid == clubId) ||
+        (resource.data.active == true)
+      );
+
+      // Only admin can list all clubs
+      allow list: if isAdmin();
+
+      // Only admin can create, update, or delete club records (including verified and active flags)
       allow create, update, delete: if isAdmin() && isValidId(clubId);
     }
 
@@ -102,6 +118,28 @@ service cloud.firestore {
                     incoming().keys().hasAll(['eventId', 'eventTitle', 'reason', 'reportedAt']) &&
                     incoming().reason in ['Fake or misleading', 'Inappropriate', 'Wrong details', 'Other'];
       allow read, list, update, delete: if isAdmin() && isValidId(reportId);
+    }
+
+    // REGISTRATIONS COLLECTION (In-App Student Participation):
+    // Anyone can create a registration that passes validation.
+    // Only the event's owner club and the admin can read/list them.
+    // No one can edit registrations from the client.
+    match /registrations/{registrationId} {
+      allow create: if isValidId(registrationId) &&
+                    incoming().keys().hasAll(['eventId', 'eventTitle', 'fullName', 'usn', 'email', 'phone', 'registeredAt']) &&
+                    incoming().fullName is string && incoming().fullName.size() <= 100 &&
+                    incoming().email is string && incoming().email.size() <= 120 &&
+                    incoming().usn is string && incoming().usn.size() <= 30;
+
+      // Only the event owner club or admin can read participant data
+      allow read: if isAdmin() || (
+        isSignedIn() &&
+        exists(/databases/$(database)/documents/events/$(resource.data.eventId)) &&
+        get(/databases/$(database)/documents/events/$(resource.data.eventId)).data.clubId == request.auth.uid
+      );
+
+      allow update: if false; // Immutable registrations
+      allow delete: if isAdmin();
     }
   }
 }

@@ -121,7 +121,7 @@ export const AskAiView: React.FC<AskAiViewProps> = ({
         </div>
 
         <div className="p-3 rounded-2xl bg-white/10 backdrop-blur-md border border-white/15 text-xs text-emerald-200">
-          🔒 Private: No student login needed
+          Private: No student login needed
         </div>
       </div>
 
@@ -138,7 +138,7 @@ export const AskAiView: React.FC<AskAiViewProps> = ({
               disabled={loading}
               className="text-xs bg-white hover:bg-emerald-50 hover:text-emerald-800 hover:border-emerald-300 border border-slate-200 px-3.5 py-2 rounded-xl text-slate-700 font-medium transition shadow-2xs active:scale-95 text-left disabled:opacity-50"
             >
-              💬 "{chip}"
+              "{chip}"
             </button>
           ))}
         </div>

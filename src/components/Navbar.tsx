@@ -17,8 +17,8 @@ import { useAuth } from '../context/AuthContext';
 import { Logo } from './Logo';
 
 interface NavbarProps {
-  currentTab: 'feed' | 'calendar' | 'schedule' | 'ask-ai' | 'club-portal' | 'admin';
-  setCurrentTab: (tab: 'feed' | 'calendar' | 'schedule' | 'ask-ai' | 'club-portal' | 'admin') => void;
+  currentTab: 'feed' | 'calendar' | 'schedule' | 'ask-ai' | 'club-portal' | 'manage-clubs' | 'admin';
+  setCurrentTab: (tab: 'feed' | 'calendar' | 'schedule' | 'ask-ai' | 'club-portal' | 'manage-clubs' | 'admin') => void;
   bookmarkCount: number;
   onOpenNewEventModal: () => void;
   onOpenLoginModal: () => void;
@@ -192,11 +192,16 @@ export const Navbar: React.FC<NavbarProps> = ({
 
             {isAdmin && (
               <button
-                onClick={onOpenAdminReportsModal}
-                className="px-3.5 py-2 rounded-xl font-medium text-xs sm:text-sm flex items-center gap-1.5 bg-purple-50 text-purple-800 hover:bg-purple-100 transition"
+                onClick={() => setCurrentTab('manage-clubs')}
+                className={`px-3.5 py-2 rounded-xl font-medium text-xs sm:text-sm flex items-center gap-1.5 transition ${
+                  currentTab === 'manage-clubs'
+                    ? 'bg-purple-100 text-purple-900 font-bold shadow-2xs'
+                    : 'bg-purple-50 text-purple-800 hover:bg-purple-100'
+                }`}
+                title="Manage Clubs & Verification (Admin Only)"
               >
-                <ShieldAlert className="w-4 h-4 text-purple-600" />
-                <span>Moderation Reports</span>
+                <Building2 className="w-4 h-4 text-purple-700" />
+                <span>Manage Clubs</span>
               </button>
             )}
           </nav>
@@ -210,6 +215,17 @@ export const Navbar: React.FC<NavbarProps> = ({
               >
                 <PlusCircle className="w-4 h-4" />
                 <span>Post Event</span>
+              </button>
+            )}
+
+            {isAdmin && (
+              <button
+                onClick={onOpenAdminReportsModal}
+                className="hidden xl:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 font-semibold text-xs transition"
+                title="View student moderation flags & reported events"
+              >
+                <ShieldAlert className="w-3.5 h-3.5 text-purple-600" />
+                <span>Reports</span>
               </button>
             )}
 
@@ -297,7 +313,17 @@ export const Navbar: React.FC<NavbarProps> = ({
           <span>Ask AI</span>
         </button>
 
-        {isClub ? (
+        {isAdmin ? (
+          <button
+            onClick={() => setCurrentTab('manage-clubs')}
+            className={`flex-1 py-1.5 flex flex-col items-center gap-0.5 rounded-lg text-[10px] ${
+              currentTab === 'manage-clubs' ? 'text-purple-700 font-black' : 'text-slate-500 font-medium'
+            }`}
+          >
+            <Building2 className="w-4 h-4" />
+            <span>Manage</span>
+          </button>
+        ) : isClub ? (
           <button
             onClick={() => setCurrentTab('club-portal')}
             className={`flex-1 py-1.5 flex flex-col items-center gap-0.5 rounded-lg text-[10px] ${

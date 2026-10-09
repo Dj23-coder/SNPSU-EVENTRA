@@ -52,7 +52,7 @@ export const TermsPrivacyModal: React.FC<TermsPrivacyModalProps> = ({ isOpen, on
               2. Club Responsibility & Content Accuracy
             </h4>
             <p>
-              Authorized student clubs post their own notices. Clubs are strictly responsible for posting accurate, verified, and lawful information, including venues, timings, entry fees, and coordinator numbers.
+              Club accounts are created and managed by the Student Affairs Office. Authorized student clubs post their own notices. Clubs are strictly responsible for posting accurate, verified, and lawful information, including venues, timings, entry fees, and coordinator numbers.
             </p>
           </section>
 
