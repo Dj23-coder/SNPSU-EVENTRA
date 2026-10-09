@@ -1,2 +1,2 @@
-https://snpsu-eventra.ai.studio 
+snpsu-eventra.vercel.app
 SNPSU Eventra is a centralized event management platform designed to streamline event discovery, registration, and coordination across campus. It connects organizers and attendees through real-time updates, intuitive scheduling, and seamless participant tracking. Built for efficiency and ease of use, Eventra simplifies university event operations from planning to execution.
