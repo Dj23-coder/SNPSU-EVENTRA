@@ -118,7 +118,7 @@ export const MonthCalendarView: React.FC<MonthCalendarViewProps> = ({ events, on
           <div className="grid grid-cols-7 gap-1 sm:gap-1.5">
             {/* Blank offset tiles */}
             {Array.from({ length: firstDay }).map((_, i) => (
-              <div key={`blank-${i}`} className="h-16 sm:h-20 bg-slate-50/50 rounded-xl" />
+              <div key={`blank-${i}`} className="min-h-[52px] sm:h-20 bg-slate-50/50 rounded-xl" />
             ))}
 
             {/* Days in Month */}
@@ -136,7 +136,7 @@ export const MonthCalendarView: React.FC<MonthCalendarViewProps> = ({ events, on
                 <button
                   key={dateStr}
                   onClick={() => setSelectedDayString(dateStr)}
-                  className={`h-16 sm:h-20 p-1.5 rounded-xl border text-left transition flex flex-col justify-between relative group ${
+                  className={`min-h-[52px] sm:h-20 p-1 sm:p-1.5 rounded-xl border text-left transition flex flex-col justify-between relative group ${
                     isSelected
                       ? 'border-emerald-600 bg-emerald-50/50 ring-2 ring-emerald-500/20'
                       : isToday
@@ -166,8 +166,18 @@ export const MonthCalendarView: React.FC<MonthCalendarViewProps> = ({ events, on
                     )}
                   </div>
 
-                  {/* Tiny Event Chips / Dots */}
-                  <div className="space-y-0.5 overflow-hidden w-full">
+                  {/* Mobile Dot Indicators */}
+                  <div className="flex sm:hidden items-center justify-center gap-0.5 mt-1 min-h-[6px]">
+                    {dayEvents.slice(0, 3).map((_, idx) => (
+                      <span key={idx} className="w-1.5 h-1.5 rounded-full bg-emerald-600 inline-block" />
+                    ))}
+                    {dayEvents.length > 3 && (
+                      <span className="text-[8px] font-black text-slate-600 leading-none">+</span>
+                    )}
+                  </div>
+
+                  {/* Desktop Event Chips */}
+                  <div className="hidden sm:block space-y-0.5 overflow-hidden w-full">
                     {dayEvents.slice(0, 2).map(ev => (
                       <div
                         key={ev.id}

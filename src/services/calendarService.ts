@@ -120,6 +120,7 @@ export function getWhatsAppShareUrl(event: EventItem, currentUrl?: string): stri
 
 /**
  * WhatsApp coordinator direct message (wa.me)
+ * Prefilled message: "Hi, I have a question about [event title]"
  */
 export function getWhatsAppUrl(event: EventItem): string {
   let phone = event.contactWhatsApp.replace(/\D/g, '');
@@ -130,7 +131,7 @@ export function getWhatsAppUrl(event: EventItem): string {
     phone = `91${phone}`;
   }
 
-  const message = `Hi, I have a question about "${event.title}" organised by ${event.clubName} at Sapthagiri NPS University.`;
+  const message = `Hi, I have a question about ${event.title}`;
   return `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
 }
 
@@ -144,15 +145,14 @@ export function maskPhoneNumber(phone: string): string {
 }
 
 /**
- * Format date for friendly display
+ * Format date for friendly display as "9 Oct 2026" (day, short month, year) in IST
  */
 export function formatDisplayDate(dateStr: string): string {
   if (!dateStr) return '';
   try {
     const [year, month, day] = dateStr.split('-').map(Number);
     const date = new Date(year, month - 1, day);
-    return date.toLocaleDateString('en-IN', {
-      weekday: 'short',
+    return date.toLocaleDateString('en-GB', {
       day: 'numeric',
       month: 'short',
       year: 'numeric',
@@ -160,6 +160,49 @@ export function formatDisplayDate(dateStr: string): string {
     });
   } catch {
     return dateStr;
+  }
+}
+
+/**
+ * Format updated timestamp as "9 Oct 2026" in IST
+ */
+export function formatUpdatedDate(timestamp: string | number): string {
+  if (!timestamp) return '';
+  try {
+    const date = new Date(timestamp);
+    return date.toLocaleDateString('en-GB', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+      timeZone: TIMEZONE,
+    });
+  } catch {
+    return String(timestamp);
+  }
+}
+
+/**
+ * Format timestamp as "9 Oct 2026, 3:30 PM" in IST
+ */
+export function formatDateTimeIST(timestamp: string | number): string {
+  if (!timestamp) return '';
+  try {
+    const date = new Date(timestamp);
+    const dateStr = date.toLocaleDateString('en-GB', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+      timeZone: TIMEZONE,
+    });
+    const timeStr = date.toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+      timeZone: TIMEZONE,
+    });
+    return `${dateStr}, ${timeStr}`;
+  } catch {
+    return String(timestamp);
   }
 }
 

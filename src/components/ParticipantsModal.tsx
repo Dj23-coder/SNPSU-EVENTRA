@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 import { EventItem, EventRegistration } from '../types';
 import { getEventRegistrations, downloadRegistrationsCsv } from '../services/storageService';
-import { formatDisplayDate, formatTime12h } from '../services/calendarService';
+import { formatDisplayDate, formatTime12h, formatDateTimeIST } from '../services/calendarService';
 import { useAuth } from '../context/AuthContext';
 
 interface ParticipantsModalProps {
@@ -255,15 +255,7 @@ export const ParticipantsModal: React.FC<ParticipantsModalProps> = ({
                       <td className="py-3 px-3.5 text-slate-500 whitespace-nowrap text-[11px]">
                         <div className="flex items-center gap-1">
                           <Clock className="w-3 h-3 text-slate-400" />
-                          <span>
-                            {new Date(reg.registeredAt).toLocaleDateString('en-IN', {
-                              day: 'numeric',
-                              month: 'short',
-                              year: 'numeric',
-                              hour: '2-digit',
-                              minute: '2-digit',
-                            })}
-                          </span>
+                          <span>{formatDateTimeIST(reg.registeredAt)}</span>
                         </div>
                       </td>
                     </tr>

@@ -1,5 +1,6 @@
 import { EventItem, ClubUser, ClashResult, ReportItem, ReportReason, EventRegistration, ClubAccessRequest } from '../types';
 import { getInitialEvents, INITIAL_CLUBS, getInitialRegistrations, INITIAL_ACCESS_REQUESTS } from '../data/sampleData';
+import { formatDateTimeIST } from './calendarService';
 
 const EVENTS_STORAGE_KEY = 'snpsu_eventra_events_v4';
 const BOOKMARKS_STORAGE_KEY = 'snpsu_eventra_bookmarks_v3';
@@ -302,7 +303,7 @@ export function downloadRegistrationsCsv(eventId: string, eventTitle: string): b
     return false;
   }
 
-  const headers = ['Full Name', 'USN/Roll No', 'College Email', 'Phone', 'Department', 'Year', 'Registration Date'];
+  const headers = ['Full Name', 'USN/Roll No', 'College Email', 'Phone', 'Department', 'Year', 'Registered At (IST)'];
   const rows = regs.map(r => [
     `"${r.fullName.replace(/"/g, '""')}"`,
     `"${r.usn.replace(/"/g, '""')}"`,
@@ -310,7 +311,7 @@ export function downloadRegistrationsCsv(eventId: string, eventTitle: string): b
     `"${r.phone.replace(/"/g, '""')}"`,
     `"${r.department.replace(/"/g, '""')}"`,
     `"${r.year.replace(/"/g, '""')}"`,
-    `"${new Date(r.registeredAt).toLocaleString('en-IN')}"`,
+    `"${formatDateTimeIST(r.registeredAt)}"`,
   ]);
 
   const csvContent = [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
@@ -318,8 +319,8 @@ export function downloadRegistrationsCsv(eventId: string, eventTitle: string): b
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
-  const cleanTitle = eventTitle.replace(/[^a-zA-Z0-9]/g, '_').slice(0, 24);
-  link.download = `Participants_${cleanTitle}.csv`;
+  const cleanTitle = eventTitle.replace(/[^a-zA-Z0-9]/g, '_').slice(0, 30);
+  link.download = `${cleanTitle}_Participants_SNPSU.csv`;
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
@@ -563,12 +564,15 @@ export function getAdminMetrics(): {
 
 /* ==================== BOOKMARKS / MY SCHEDULE ==================== */
 
-function cleanDeadBookmarks(existingEvents: EventItem[]): string[] {
+export function cleanDeadBookmarks(existingEvents: EventItem[]): string[] {
   const validIds = new Set(existingEvents.map(e => e.id));
   const current = getBookmarkedIds();
   const cleaned = current.filter(id => validIds.has(id));
   if (cleaned.length !== current.length) {
     safeSetItem(BOOKMARKS_STORAGE_KEY, JSON.stringify(cleaned));
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('snpsu-bookmarks-updated', { detail: cleaned }));
+    }
   }
   return cleaned;
 }

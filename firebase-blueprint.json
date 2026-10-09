@@ -56,6 +56,37 @@
         "contactPhone": { "type": "string", "maxLength": 15 }
       },
       "required": ["name", "email", "category", "role"]
+    },
+    "Registration": {
+      "title": "Registration",
+      "description": "An in-app event participant registration submitted by a university student.",
+      "type": "object",
+      "properties": {
+        "eventId": { "type": "string", "maxLength": 100 },
+        "fullName": { "type": "string", "maxLength": 100 },
+        "usn": { "type": "string", "maxLength": 30 },
+        "email": { "type": "string", "maxLength": 120 },
+        "phone": { "type": "string", "pattern": "^[0-9]{10}$" },
+        "department": { "type": "string", "maxLength": 80 },
+        "year": { "type": "string", "maxLength": 40 },
+        "registeredAt": { "type": "string" },
+        "consent": { "type": "boolean" }
+      },
+      "required": ["eventId", "fullName", "usn", "email", "phone", "department", "year", "registeredAt"]
+    },
+    "Report": {
+      "title": "Report",
+      "description": "A moderation report submitted by a student regarding an event.",
+      "type": "object",
+      "properties": {
+        "eventId": { "type": "string", "maxLength": 100 },
+        "eventTitle": { "type": "string", "maxLength": 150 },
+        "reason": { "type": "string", "enum": ["Fake or misleading", "Inappropriate", "Wrong details", "Other"] },
+        "details": { "type": "string", "maxLength": 500 },
+        "reportedAt": { "type": "string" },
+        "resolved": { "type": "boolean" }
+      },
+      "required": ["eventId", "eventTitle", "reason", "reportedAt"]
     }
   },
   "firestore": {
@@ -66,6 +97,14 @@
     "/clubs/{clubId}": {
       "schema": "Club",
       "description": "Collection of authorized clubs provisioned by university admin"
+    },
+    "/registrations/{registrationId}": {
+      "schema": "Registration",
+      "description": "Collection of student registrations for in-app events"
+    },
+    "/reports/{reportId}": {
+      "schema": "Report",
+      "description": "Collection of moderation reports flagged by students for university administrator review"
     }
   }
 }

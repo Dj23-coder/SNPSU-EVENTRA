@@ -20,7 +20,7 @@ import {
 } from 'lucide-react';
 import { EventItem, EventStatus } from '../types';
 import { useAuth } from '../context/AuthContext';
-import { formatDisplayDate, formatTime12h } from '../services/calendarService';
+import { formatDisplayDate, formatUpdatedDate, formatTime12h } from '../services/calendarService';
 import { generateShareText } from '../services/aiService';
 import { getEventTypeBadgeClass, getStatusBadgeConfig } from './EventCard';
 import { getEventRegistrations } from '../services/storageService';
@@ -256,7 +256,7 @@ export const ClubDashboard: React.FC<ClubDashboardProps> = ({
                       )}
 
                       <span className="text-xs text-slate-400">
-                        Updated: {new Date(event.lastUpdated).toLocaleDateString()}
+                        Updated: {formatUpdatedDate(event.lastUpdated)}
                       </span>
                     </div>
 

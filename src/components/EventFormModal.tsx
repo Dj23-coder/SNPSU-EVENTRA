@@ -19,6 +19,7 @@ import {
   Tag,
   ShieldCheck,
   Check,
+  Copy,
 } from 'lucide-react';
 import { EventItem, EventType, EventStatus, ClashResult, ExtractedEventData, RegistrationType } from '../types';
 import { checkVenueClash } from '../services/storageService';
@@ -107,6 +108,22 @@ export const EventFormModal: React.FC<EventFormModalProps> = ({
 
   // Mandatory Club Consent Checkbox
   const [consentConfirmed, setConsentConfirmed] = useState(false);
+  const [copiedFormHelper, setCopiedFormHelper] = useState(false);
+
+  const handleCopyFormQuestions = () => {
+    const questionsText = `Suggested Google Form Questions for "${title || 'Campus Event'}":
+1. Full Name (Short answer - Required)
+2. University Serial Number (USN / Roll No) (Short answer - Required, uppercase)
+3. College Email Address (Short answer - Required, e.g. name@sapthagiri.edu.in)
+4. WhatsApp Contact Number (Short answer - Required, 10 digits)
+5. Department / Branch (Dropdown or Multiple choice - Required: CSE, ISE, ECE, ME, BT, etc.)
+6. Year of Study (Multiple choice - Required: 1st Year, 2nd Year, 3rd Year, 4th Year)
+7. Agreement & Consent (Checkbox - Required: "I agree to share these details with the organizing club and abide by university event conduct guidelines.")`;
+
+    navigator.clipboard.writeText(questionsText);
+    setCopiedFormHelper(true);
+    setTimeout(() => setCopiedFormHelper(false), 2500);
+  };
 
   // Poster Image upload state
   const [uploadedImageInfo, setUploadedImageInfo] = useState<{ sizeKb: number } | null>(null);
@@ -374,10 +391,16 @@ export const EventFormModal: React.FC<EventFormModalProps> = ({
       errs.contactWhatsApp = 'Must be a valid 10-digit Indian mobile number (starting with 6, 7, 8, or 9)';
     }
 
-    // Link safety: links must start with https://
+    // Link safety: Google Form links must start with https://docs.google.com/forms or https://forms.gle
     if (registrationType === 'external') {
-      if (registrationLink.trim() && !registrationLink.trim().startsWith('https://')) {
-        errs.registrationLink = 'Registration link must start with https:// for safety';
+      const trimmedLink = registrationLink.trim();
+      if (!trimmedLink) {
+        errs.registrationLink = 'Google Form link is required';
+      } else if (
+        !trimmedLink.startsWith('https://docs.google.com/forms') &&
+        !trimmedLink.startsWith('https://forms.gle')
+      ) {
+        errs.registrationLink = 'Link must start with https://docs.google.com/forms or https://forms.gle';
       }
     }
 
@@ -1031,11 +1054,11 @@ export const EventFormModal: React.FC<EventFormModalProps> = ({
                       }`}
                     >
                       <div className="flex items-center justify-between">
-                        <span className="text-xs font-bold text-slate-900">External Link</span>
+                        <span className="text-xs font-bold text-slate-900">Google Form</span>
                         {registrationType === 'external' && <Check className="w-4 h-4 text-emerald-600" />}
                       </div>
                       <p className="text-[11px] text-slate-500 mt-1">
-                        Google Form, Unstop, or club site
+                        Paste Google Form link
                       </p>
                     </button>
 
@@ -1060,43 +1083,79 @@ export const EventFormModal: React.FC<EventFormModalProps> = ({
 
                   {/* Conditional Fields based on Registration Type */}
                   {registrationType === 'external' && (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-slate-200">
-                      <div>
-                        <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                          Registration Link *
-                        </label>
-                        <input
-                          type="url"
-                          value={registrationLink}
-                          onChange={e => setRegistrationLink(e.target.value)}
-                          placeholder="https://forms.gle/... (starts with https://)"
-                          className={`w-full px-3.5 py-2.5 rounded-xl border text-xs sm:text-sm ${
-                            errors.registrationLink ? 'border-red-500' : 'border-slate-300'
-                          }`}
-                        />
-                        <p className="text-[10px] text-slate-400 mt-1">
-                          Must begin with https://
-                        </p>
-                        {errors.registrationLink && (
-                          <p className="text-xs text-red-600 mt-1">{errors.registrationLink}</p>
-                        )}
+                    <div className="space-y-3 pt-2 border-t border-slate-200">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                            Google Form Link *
+                          </label>
+                          <input
+                            type="url"
+                            value={registrationLink}
+                            onChange={e => setRegistrationLink(e.target.value)}
+                            placeholder="https://forms.gle/... or https://docs.google.com/forms/..."
+                            className={`w-full px-3.5 py-2.5 rounded-xl border text-xs sm:text-sm ${
+                              errors.registrationLink ? 'border-red-500' : 'border-slate-300'
+                            }`}
+                          />
+                          <p className="text-[10px] text-slate-400 mt-1">
+                            Must begin with https://docs.google.com/forms or https://forms.gle
+                          </p>
+                          {errors.registrationLink && (
+                            <p className="text-xs text-red-600 mt-1">{errors.registrationLink}</p>
+                          )}
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                            Registration Deadline (Optional)
+                          </label>
+                          <input
+                            type="date"
+                            value={registrationDeadline}
+                            onChange={e => setRegistrationDeadline(e.target.value)}
+                            className={`w-full px-3.5 py-2.5 rounded-xl border text-xs sm:text-sm ${
+                              errors.registrationDeadline ? 'border-red-500' : 'border-slate-300'
+                            }`}
+                          />
+                          {errors.registrationDeadline && (
+                            <p className="text-xs text-red-600 mt-1">{errors.registrationDeadline}</p>
+                          )}
+                        </div>
                       </div>
 
-                      <div>
-                        <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                          Registration Deadline (Optional)
-                        </label>
-                        <input
-                          type="date"
-                          value={registrationDeadline}
-                          onChange={e => setRegistrationDeadline(e.target.value)}
-                          className={`w-full px-3.5 py-2.5 rounded-xl border text-xs sm:text-sm ${
-                            errors.registrationDeadline ? 'border-red-500' : 'border-slate-300'
-                          }`}
-                        />
-                        {errors.registrationDeadline && (
-                          <p className="text-xs text-red-600 mt-1">{errors.registrationDeadline}</p>
-                        )}
+                      {/* Form Helper & Club Note */}
+                      <div className="p-3.5 rounded-xl bg-blue-50/70 border border-blue-200/80 text-xs space-y-2">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                          <div>
+                            <p className="font-bold text-blue-950 flex items-center gap-1.5">
+                              <span>Form helper for Google Forms</span>
+                            </p>
+                            <p className="text-[11px] text-blue-800 font-medium mt-0.5">
+                              Responses are collected in Google Forms. EVENTRA cannot see them.
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={handleCopyFormQuestions}
+                            className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-blue-300 hover:bg-blue-100/70 text-blue-900 text-xs font-bold shadow-2xs transition active:scale-95 shrink-0"
+                          >
+                            {copiedFormHelper ? (
+                              <>
+                                <Check className="w-3.5 h-3.5 text-emerald-600" />
+                                <span className="text-emerald-700">Copied Questions!</span>
+                              </>
+                            ) : (
+                              <>
+                                <Copy className="w-3.5 h-3.5 text-blue-600" />
+                                <span>Copy Suggested Questions</span>
+                              </>
+                            )}
+                          </button>
+                        </div>
+                        <p className="text-[10px] text-blue-700/90 leading-relaxed">
+                          Click Copy to get recommended fields (Name, USN, College Email, Phone, Department, Year, Consent) formatted to paste into Google Forms.
+                        </p>
                       </div>
                     </div>
                   )}
