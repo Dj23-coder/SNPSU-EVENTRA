@@ -44,6 +44,14 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [confirmedReg, setConfirmedReg] = useState<EventRegistration | null>(null);
 
+  React.useEffect(() => {
+    if (isOpen) {
+      setErrorMsg(null);
+      setConfirmedReg(null);
+      setConsent(false);
+    }
+  }, [isOpen, event?.id]);
+
   if (!isOpen || !event) return null;
 
   // Check seat limit & deadline
@@ -226,6 +234,21 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
                   <span className="font-bold text-amber-950">
                     {seatsLeft} {seatsLeft === 1 ? 'seat' : 'seats'} left of {event.maxSeats}
                   </span>
+                </div>
+              )}
+
+              {/* Status Note: What Changed for Postponed or Venue Changed */}
+              {(event.status === 'Postponed' || event.status === 'Venue Changed') && event.statusNote && (
+                <div className={`p-3 rounded-xl border text-xs flex items-start gap-2.5 ${
+                  event.status === 'Postponed'
+                    ? 'bg-orange-50 border-orange-200 text-orange-950'
+                    : 'bg-amber-50 border-amber-200 text-amber-950'
+                }`}>
+                  <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-amber-600" />
+                  <div>
+                    <p className="font-bold uppercase tracking-wider text-[11px]">Notice: {event.status}</p>
+                    <p className="font-medium mt-0.5">{event.statusNote}</p>
+                  </div>
                 </div>
               )}
 

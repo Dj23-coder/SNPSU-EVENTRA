@@ -20,7 +20,7 @@ import {
   ShieldCheck,
   Check,
 } from 'lucide-react';
-import { EventItem, EventType, EventStatus, ClashResult, ExtractedEventData } from '../types';
+import { EventItem, EventType, EventStatus, ClashResult, ExtractedEventData, RegistrationType } from '../types';
 import { checkVenueClash } from '../services/storageService';
 import { parseNoticeWithGemini, parsePosterWithGemini, compressImageInBrowser } from '../services/aiService';
 import { useAuth } from '../context/AuthContext';
@@ -95,6 +95,8 @@ export const EventFormModal: React.FC<EventFormModalProps> = ({
   const [entryFee, setEntryFee] = useState('Free');
   const [certificateProvided, setCertificateProvided] = useState(true);
   const [prize, setPrize] = useState('');
+  const [registrationType, setRegistrationType] = useState<RegistrationType>('in_app');
+  const [maxSeats, setMaxSeats] = useState<string>('');
   const [registrationLink, setRegistrationLink] = useState('');
   const [registrationDeadline, setRegistrationDeadline] = useState('');
   const [posterUrl, setPosterUrl] = useState('');
@@ -137,6 +139,11 @@ export const EventFormModal: React.FC<EventFormModalProps> = ({
         setEntryFee(initialEvent.entryFee || 'Free');
         setCertificateProvided(initialEvent.certificateProvided);
         setPrize(initialEvent.prize || '');
+        const initialRegType: RegistrationType =
+          initialEvent.registrationType ||
+          (initialEvent.registrationLink ? 'external' : 'none');
+        setRegistrationType(initialRegType);
+        setMaxSeats(initialEvent.maxSeats ? String(initialEvent.maxSeats) : '');
         setRegistrationLink(initialEvent.registrationLink || '');
         setRegistrationDeadline(initialEvent.registrationDeadline || '');
         setPosterUrl(initialEvent.posterUrl || '');
@@ -165,6 +172,8 @@ export const EventFormModal: React.FC<EventFormModalProps> = ({
         setEntryFee('Free');
         setCertificateProvided(true);
         setPrize('');
+        setRegistrationType('in_app');
+        setMaxSeats('');
         setRegistrationLink('');
         setRegistrationDeadline('');
         setPosterUrl('');
@@ -229,7 +238,10 @@ export const EventFormModal: React.FC<EventFormModalProps> = ({
         setCertificateProvided(extracted.certificate.toLowerCase() === 'yes');
       }
       if (extracted.prize) setPrize(extracted.prize);
-      if (extracted.registration_link) setRegistrationLink(extracted.registration_link);
+      if (extracted.registration_link) {
+        setRegistrationLink(extracted.registration_link);
+        setRegistrationType('external');
+      }
       if (extracted.contact_name) setContactName(extracted.contact_name);
       if (extracted.contact) setContactWhatsApp(extracted.contact.replace(/\D/g, '').slice(-10));
 
@@ -285,7 +297,10 @@ export const EventFormModal: React.FC<EventFormModalProps> = ({
         setCertificateProvided(extracted.certificate.toLowerCase() === 'yes');
       }
       if (extracted.prize) setPrize(extracted.prize);
-      if (extracted.registration_link) setRegistrationLink(extracted.registration_link);
+      if (extracted.registration_link) {
+        setRegistrationLink(extracted.registration_link);
+        setRegistrationType('external');
+      }
       if (extracted.contact_name) setContactName(extracted.contact_name);
       if (extracted.contact) setContactWhatsApp(extracted.contact.replace(/\D/g, '').slice(-10));
 
@@ -360,9 +375,19 @@ export const EventFormModal: React.FC<EventFormModalProps> = ({
     }
 
     // Link safety: links must start with https://
-    if (registrationLink.trim() && !registrationLink.trim().startsWith('https://')) {
-      errs.registrationLink = 'Registration link must start with https:// for safety';
+    if (registrationType === 'external') {
+      if (registrationLink.trim() && !registrationLink.trim().startsWith('https://')) {
+        errs.registrationLink = 'Registration link must start with https:// for safety';
+      }
     }
+
+    if (registrationType === 'in_app' && maxSeats.trim()) {
+      const seatsNum = Number(maxSeats.trim());
+      if (isNaN(seatsNum) || !Number.isInteger(seatsNum) || seatsNum <= 0) {
+        errs.maxSeats = 'Maximum seats must be a positive whole number';
+      }
+    }
+
     if (posterUrl.trim() && !posterUrl.startsWith('https://') && !posterUrl.startsWith('data:image/')) {
       errs.posterUrl = 'Poster image link must start with https://';
     }
@@ -387,6 +412,9 @@ export const EventFormModal: React.FC<EventFormModalProps> = ({
     const matchingClub = clubs.find(c => c.id === clubId);
     const verified = matchingClub ? matchingClub.isVerified : false;
 
+    const parsedSeats =
+      registrationType === 'in_app' && maxSeats.trim() ? parseInt(maxSeats.trim(), 10) : undefined;
+
     const eventPayload: EventItem = {
       id:
         mode === 'edit' && initialEvent
@@ -405,8 +433,11 @@ export const EventFormModal: React.FC<EventFormModalProps> = ({
       entryFee: entryFee.trim() || 'Free',
       certificateProvided,
       prize: prize.trim() || undefined,
-      registrationLink: registrationLink.trim() || undefined,
+      registrationType,
+      registrationLink: registrationType === 'external' ? (registrationLink.trim() || undefined) : undefined,
       registrationDeadline: registrationDeadline || undefined,
+      maxSeats: parsedSeats,
+      seatsBooked: initialEvent?.seatsBooked ?? 0,
       posterUrl: posterUrl.trim() || undefined,
       contactName: contactName.trim(),
       contactWhatsApp: contactWhatsApp.replace(/\D/g, '').slice(-10),
@@ -959,45 +990,168 @@ export const EventFormModal: React.FC<EventFormModalProps> = ({
                   </button>
                 </div>
 
-                {/* Registration Link & Deadline */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* Registration Setting Section */}
+                <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-4">
                   <div>
-                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                      Registration Link (Optional)
+                    <label className="block text-xs font-bold text-slate-800 uppercase tracking-wider mb-1">
+                      Registration *
                     </label>
-                    <input
-                      type="url"
-                      value={registrationLink}
-                      onChange={e => setRegistrationLink(e.target.value)}
-                      placeholder="https://forms.gle/... (must start with https://)"
-                      className={`w-full px-3.5 py-2.5 rounded-xl border text-xs sm:text-sm ${
-                        errors.registrationLink ? 'border-red-500' : 'border-slate-300'
-                      }`}
-                    />
-                    <p className="text-[10px] text-slate-400 mt-1">
-                      Opens an external site for student signups. Must start with https://
+                    <p className="text-[11px] text-slate-500">
+                      Choose how students register to participate in this event
                     </p>
-                    {errors.registrationLink && (
-                      <p className="text-xs text-red-600 mt-1">{errors.registrationLink}</p>
-                    )}
                   </div>
 
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                      Registration Deadline (Optional)
-                    </label>
-                    <input
-                      type="date"
-                      value={registrationDeadline}
-                      onChange={e => setRegistrationDeadline(e.target.value)}
-                      className={`w-full px-3.5 py-2.5 rounded-xl border text-xs sm:text-sm ${
-                        errors.registrationDeadline ? 'border-red-500' : 'border-slate-300'
+                  {/* 3 Registration Modes */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                    <button
+                      type="button"
+                      onClick={() => setRegistrationType('none')}
+                      className={`p-3 rounded-xl border text-left transition flex flex-col justify-between ${
+                        registrationType === 'none'
+                          ? 'border-emerald-600 bg-emerald-50/60 ring-2 ring-emerald-500/20'
+                          : 'border-slate-300 bg-white hover:border-slate-400'
                       }`}
-                    />
-                    {errors.registrationDeadline && (
-                      <p className="text-xs text-red-600 mt-1">{errors.registrationDeadline}</p>
-                    )}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-slate-900">None</span>
+                        {registrationType === 'none' && <Check className="w-4 h-4 text-emerald-600" />}
+                      </div>
+                      <p className="text-[11px] text-slate-500 mt-1">
+                        Open entry, no registration needed
+                      </p>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setRegistrationType('external')}
+                      className={`p-3 rounded-xl border text-left transition flex flex-col justify-between ${
+                        registrationType === 'external'
+                          ? 'border-emerald-600 bg-emerald-50/60 ring-2 ring-emerald-500/20'
+                          : 'border-slate-300 bg-white hover:border-slate-400'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-slate-900">External Link</span>
+                        {registrationType === 'external' && <Check className="w-4 h-4 text-emerald-600" />}
+                      </div>
+                      <p className="text-[11px] text-slate-500 mt-1">
+                        Google Form, Unstop, or club site
+                      </p>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setRegistrationType('in_app')}
+                      className={`p-3 rounded-xl border text-left transition flex flex-col justify-between ${
+                        registrationType === 'in_app'
+                          ? 'border-emerald-600 bg-emerald-50/60 ring-2 ring-emerald-500/20'
+                          : 'border-slate-300 bg-white hover:border-slate-400'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-slate-900">In-App Registration</span>
+                        {registrationType === 'in_app' && <Check className="w-4 h-4 text-emerald-600" />}
+                      </div>
+                      <p className="text-[11px] text-slate-500 mt-1">
+                        Direct 1-tap form on EVENTRA
+                      </p>
+                    </button>
                   </div>
+
+                  {/* Conditional Fields based on Registration Type */}
+                  {registrationType === 'external' && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-slate-200">
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                          Registration Link *
+                        </label>
+                        <input
+                          type="url"
+                          value={registrationLink}
+                          onChange={e => setRegistrationLink(e.target.value)}
+                          placeholder="https://forms.gle/... (starts with https://)"
+                          className={`w-full px-3.5 py-2.5 rounded-xl border text-xs sm:text-sm ${
+                            errors.registrationLink ? 'border-red-500' : 'border-slate-300'
+                          }`}
+                        />
+                        <p className="text-[10px] text-slate-400 mt-1">
+                          Must begin with https://
+                        </p>
+                        {errors.registrationLink && (
+                          <p className="text-xs text-red-600 mt-1">{errors.registrationLink}</p>
+                        )}
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                          Registration Deadline (Optional)
+                        </label>
+                        <input
+                          type="date"
+                          value={registrationDeadline}
+                          onChange={e => setRegistrationDeadline(e.target.value)}
+                          className={`w-full px-3.5 py-2.5 rounded-xl border text-xs sm:text-sm ${
+                            errors.registrationDeadline ? 'border-red-500' : 'border-slate-300'
+                          }`}
+                        />
+                        {errors.registrationDeadline && (
+                          <p className="text-xs text-red-600 mt-1">{errors.registrationDeadline}</p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {registrationType === 'in_app' && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-slate-200">
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                          Maximum Seats (Optional)
+                        </label>
+                        <input
+                          type="number"
+                          min={1}
+                          value={maxSeats}
+                          onChange={e => setMaxSeats(e.target.value)}
+                          placeholder="e.g. 50 (leave empty for unlimited)"
+                          className={`w-full px-3.5 py-2.5 rounded-xl border text-xs sm:text-sm ${
+                            errors.maxSeats ? 'border-red-500' : 'border-slate-300'
+                          }`}
+                        />
+                        <p className="text-[10px] text-slate-400 mt-1">
+                          Closes automatically once seat count is reached
+                        </p>
+                        {errors.maxSeats && (
+                          <p className="text-xs text-red-600 mt-1">{errors.maxSeats}</p>
+                        )}
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                          Registration Deadline (Optional)
+                        </label>
+                        <input
+                          type="date"
+                          value={registrationDeadline}
+                          onChange={e => setRegistrationDeadline(e.target.value)}
+                          className={`w-full px-3.5 py-2.5 rounded-xl border text-xs sm:text-sm ${
+                            errors.registrationDeadline ? 'border-red-500' : 'border-slate-300'
+                          }`}
+                        />
+                        <p className="text-[10px] text-slate-400 mt-1">
+                          Registration closes automatically after this date
+                        </p>
+                        {errors.registrationDeadline && (
+                          <p className="text-xs text-red-600 mt-1">{errors.registrationDeadline}</p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {registrationType === 'none' && (
+                    <p className="text-xs text-slate-500 italic pt-1 border-t border-slate-200">
+                      ✓ No registration required. Students can directly attend at the venue.
+                    </p>
+                  )}
                 </div>
 
                 {/* Poster Image: URL or Direct Upload */}

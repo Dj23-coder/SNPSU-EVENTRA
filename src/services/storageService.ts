@@ -169,6 +169,42 @@ export function getAllRegistrations(): EventRegistration[] {
   }
 }
 
+const LOCAL_REGISTERED_EVENTS_KEY = 'snpsu_eventra_my_registered_events_v3';
+
+export function getLocallyRegisteredEventIds(): string[] {
+  const raw = safeGetItem(LOCAL_REGISTERED_EVENTS_KEY);
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+export function isUserRegisteredLocally(eventId: string): boolean {
+  const ids = getLocallyRegisteredEventIds();
+  return ids.includes(eventId);
+}
+
+export function markEventRegisteredLocally(eventId: string): void {
+  const ids = getLocallyRegisteredEventIds();
+  if (!ids.includes(eventId)) {
+    ids.push(eventId);
+    safeSetItem(LOCAL_REGISTERED_EVENTS_KEY, JSON.stringify(ids));
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('snpsu-local-registrations-updated', { detail: ids }));
+    }
+  }
+}
+
+export function getClubTotalRegistrations(clubId: string): number {
+  const events = getAllEvents(true);
+  const clubEventIds = new Set(events.filter(e => e.clubId === clubId).map(e => e.id));
+  const allRegs = getAllRegistrations();
+  return allRegs.filter(r => clubEventIds.has(r.eventId)).length;
+}
+
 export function getEventRegistrations(eventId: string): EventRegistration[] {
   const all = getAllRegistrations();
   return all.filter(r => r.eventId === eventId);
@@ -246,18 +282,24 @@ export function registerForEvent(data: {
   allRegs.unshift(newReg);
   safeSetItem(REGISTRATIONS_STORAGE_KEY, JSON.stringify(allRegs));
 
+  // Remember on this device that the student registered
+  markEventRegisteredLocally(ev.id);
+
   // Increment event seatsBooked count
   ev.seatsBooked = currentCount + 1;
   saveEvent(ev);
 
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('snpsu-registrations-updated', { detail: allRegs }));
+  }
+
   return { success: true, registration: newReg };
 }
 
-export function downloadRegistrationsCsv(eventId: string, eventTitle: string): void {
+export function downloadRegistrationsCsv(eventId: string, eventTitle: string): boolean {
   const regs = getEventRegistrations(eventId);
   if (regs.length === 0) {
-    alert('No participant registrations yet for this event.');
-    return;
+    return false;
   }
 
   const headers = ['Full Name', 'USN/Roll No', 'College Email', 'Phone', 'Department', 'Year', 'Registration Date'];
@@ -282,6 +324,7 @@ export function downloadRegistrationsCsv(eventId: string, eventTitle: string): v
   link.click();
   document.body.removeChild(link);
   URL.revokeObjectURL(url);
+  return true;
 }
 
 /* ==================== CLUBS & ADMIN MANAGEMENT LAYER ==================== */

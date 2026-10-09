@@ -16,12 +16,15 @@ import {
   Sparkles,
   Check,
   AlertTriangle,
+  Users,
 } from 'lucide-react';
 import { EventItem, EventStatus } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { formatDisplayDate, formatTime12h } from '../services/calendarService';
 import { generateShareText } from '../services/aiService';
 import { getEventTypeBadgeClass, getStatusBadgeConfig } from './EventCard';
+import { getEventRegistrations } from '../services/storageService';
+import { ParticipantsModal } from './ParticipantsModal';
 
 interface ClubDashboardProps {
   events: EventItem[];
@@ -51,6 +54,7 @@ export const ClubDashboard: React.FC<ClubDashboardProps> = ({
   const [generatedText, setGeneratedText] = useState<string>('');
   const [generatingText, setGeneratingText] = useState(false);
   const [copiedSuccess, setCopiedSuccess] = useState(false);
+  const [participantsEvent, setParticipantsEvent] = useState<EventItem | null>(null);
 
   // Filter ONLY this club's events (or all if admin)
   const myEvents = events.filter(e => {
@@ -62,6 +66,10 @@ export const ClubDashboard: React.FC<ClubDashboardProps> = ({
   const activeCount = myEvents.filter(e => e.status === 'Scheduled').length;
   const changedCount = myEvents.filter(e => e.status === 'Postponed' || e.status === 'Venue Changed').length;
   const cancelledCount = myEvents.filter(e => e.status === 'Cancelled').length;
+  const totalRegistrations = myEvents.reduce(
+    (acc, ev) => acc + getEventRegistrations(ev.id).length,
+    0
+  );
 
   const handleOpenStatusModal = (event: EventItem) => {
     setStatusChangeModalEvent(event);
@@ -170,7 +178,7 @@ export const ClubDashboard: React.FC<ClubDashboardProps> = ({
       </div>
 
       {/* KPI Counters */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
         <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-xs">
           <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total Events</p>
           <p className="text-2xl font-black text-slate-900 mt-1">{total}</p>
@@ -178,6 +186,10 @@ export const ClubDashboard: React.FC<ClubDashboardProps> = ({
         <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-xs">
           <p className="text-xs font-semibold text-emerald-600 uppercase tracking-wider">Scheduled Active</p>
           <p className="text-2xl font-black text-emerald-600 mt-1">{activeCount}</p>
+        </div>
+        <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-xs">
+          <p className="text-xs font-semibold text-blue-600 uppercase tracking-wider">Registrations</p>
+          <p className="text-2xl font-black text-blue-600 mt-1">{totalRegistrations}</p>
         </div>
         <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-xs">
           <p className="text-xs font-semibold text-amber-600 uppercase tracking-wider">Updates / Postponed</p>
@@ -300,6 +312,16 @@ export const ClubDashboard: React.FC<ClubDashboardProps> = ({
 
                   {/* Actions Toolbar */}
                   <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto pt-3 lg:pt-0 border-t lg:border-t-0 border-slate-100">
+                    {/* Participants Button */}
+                    <button
+                      onClick={() => setParticipantsEvent(event)}
+                      className="px-3 py-1.5 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-800 text-xs font-bold border border-blue-200 flex items-center gap-1.5 transition active:scale-95"
+                      title="View registered student participants and download CSV"
+                    >
+                      <Users className="w-3.5 h-3.5 text-blue-600" />
+                      <span>Participants ({getEventRegistrations(event.id).length})</span>
+                    </button>
+
                     {/* Share Text Announcement Generator */}
                     <button
                       onClick={() => handleGenerateAnnouncement(event)}
@@ -527,6 +549,12 @@ export const ClubDashboard: React.FC<ClubDashboardProps> = ({
           </div>
         </div>
       )}
+      {/* Participants Modal */}
+      <ParticipantsModal
+        isOpen={Boolean(participantsEvent)}
+        onClose={() => setParticipantsEvent(null)}
+        event={participantsEvent}
+      />
     </div>
   );
 };
