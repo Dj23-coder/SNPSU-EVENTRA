@@ -76,27 +76,79 @@ export const getStatusBadgeConfig = (status: EventStatus) => {
         label: 'Cancelled',
         bg: 'bg-red-600 text-white font-extrabold',
         border: 'border-red-600',
-        cardBorder: 'border-red-300 bg-red-50/20',
+        cardBorder: 'border-red-300',
       };
     case 'Postponed':
       return {
         label: 'Postponed',
         bg: 'bg-orange-500 text-white font-bold',
         border: 'border-orange-500',
-        cardBorder: 'border-orange-300 bg-orange-50/20',
+        cardBorder: 'border-orange-300',
       };
     case 'Venue Changed':
       return {
         label: 'Venue Changed',
         bg: 'bg-amber-400 text-amber-950 font-bold',
         border: 'border-amber-400',
-        cardBorder: 'border-amber-300 bg-amber-50/20',
+        cardBorder: 'border-amber-300',
       };
     case 'Scheduled':
     default:
       return null;
   }
 };
+
+/**
+ * Extracts the single day number from a YYYY-MM-DD date string.
+ */
+export function getDayNumber(dateStr: string): string {
+  if (!dateStr) return '';
+  const parts = dateStr.split('-');
+  if (parts.length === 3) {
+    return String(parseInt(parts[2], 10));
+  }
+  const d = new Date(dateStr);
+  return String(d.getDate());
+}
+
+/**
+ * Breaks the month name into 3 vertical syllables matching the reference editorial typography.
+ * E.g., October -> ['Oct', 'ob', 'er'], November -> ['Nov', 'em', 'ber'], December -> ['Dec', 'em', 'ber']
+ */
+export function getStackedMonth(dateStr: string): string[] {
+  if (!dateStr) return ['Mon', 'th'];
+  const parts = dateStr.split('-');
+  const monthIdx = parts.length >= 2 ? parseInt(parts[1], 10) - 1 : new Date(dateStr).getMonth();
+
+  switch (monthIdx) {
+    case 0:
+      return ['Jan', 'ua', 'ry'];
+    case 1:
+      return ['Feb', 'ru', 'ary'];
+    case 2:
+      return ['Mar', 'ch'];
+    case 3:
+      return ['Apr', 'il'];
+    case 4:
+      return ['May'];
+    case 5:
+      return ['Jun', 'e'];
+    case 6:
+      return ['Jul', 'y'];
+    case 7:
+      return ['Aug', 'ust'];
+    case 8:
+      return ['Sep', 'tem', 'ber'];
+    case 9:
+      return ['Oct', 'ob', 'er'];
+    case 10:
+      return ['Nov', 'em', 'ber'];
+    case 11:
+      return ['Dec', 'em', 'ber'];
+    default:
+      return ['Mon', 'th'];
+  }
+}
 
 export const EventCard: React.FC<EventCardProps> = ({
   event,
@@ -142,7 +194,8 @@ export const EventCard: React.FC<EventCardProps> = ({
   const whatsAppUrl = getWhatsAppUrl(event);
   const shareWhatsAppUrl = getWhatsAppShareUrl(event);
 
-  const formattedDate = formatDisplayDate(event.date);
+  const dayNumber = getDayNumber(event.date);
+  const monthParts = getStackedMonth(event.date);
   const timeRange = `${formatTime12h(event.startTime)} - ${formatTime12h(event.endTime)}`;
 
   const handleInterestedToggle = (e: React.MouseEvent) => {
@@ -152,20 +205,94 @@ export const EventCard: React.FC<EventCardProps> = ({
     setInterestedCount(result.newCount);
   };
 
-  const handleCalendarClick = () => {
+  const handleCalendarClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
     recordCalendarClick(event.id);
   };
 
   return (
     <article
-      className={`group relative rounded-2xl bg-white border transition-all duration-200 shadow-2xs hover:shadow-md flex flex-col justify-between overflow-hidden ${
-        statusConfig ? statusConfig.cardBorder : 'border-slate-200 hover:border-emerald-300'
-      } ${event.status === 'Cancelled' ? 'opacity-85' : ''}`}
+      className={`group relative bg-white border transition-all duration-200 flex flex-col justify-between overflow-hidden shadow-xs hover:shadow-lg ${
+        statusConfig ? statusConfig.cardBorder : 'border-neutral-200 hover:border-neutral-900'
+      } ${event.status === 'Cancelled' ? 'opacity-90' : ''}`}
     >
-      {/* Top Banner / Poster Thumbnail */}
+      {/* Top Section: Title, Badges, Bookmark */}
+      <div className="p-4 sm:p-5 flex-1 flex flex-col justify-between pb-3">
+        <div>
+          {/* Header row: Status / Type Pill & Bookmark */}
+          <div className="flex items-start justify-between gap-2 mb-2.5">
+            <div className="flex flex-wrap items-center gap-1.5">
+              {statusConfig ? (
+                <span className={`px-2 py-0.5 text-[10px] uppercase font-bold tracking-wider rounded-xs ${statusConfig.bg}`}>
+                  {statusConfig.label}
+                </span>
+              ) : closingSoon ? (
+                <span className="flex items-center gap-1 px-2 py-0.5 rounded-xs bg-red-600 text-white font-bold text-[10px] uppercase tracking-wider animate-pulse">
+                  <Flame className="w-2.5 h-2.5" />
+                  {getClosingSoonText(event.registrationDeadline || '')}
+                </span>
+              ) : (
+                <span className="px-2 py-0.5 text-[10px] uppercase font-semibold tracking-wider text-neutral-500 bg-neutral-100 rounded-xs">
+                  {event.eventType}
+                </span>
+              )}
+
+              {event.isClubVerified && (
+                <span
+                  className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-xs bg-blue-50 text-blue-700 text-[10px] font-medium"
+                  title="Verified Club"
+                >
+                  <ShieldCheck className="w-3 h-3 text-blue-600" />
+                  <span>Verified</span>
+                </span>
+              )}
+            </div>
+
+            {/* Bookmark star / bookmark icon */}
+            <button
+              onClick={e => {
+                e.stopPropagation();
+                onToggleBookmark(event.id);
+              }}
+              className={`p-1.5 rounded-sm transition active:scale-90 ${
+                isBookmarked
+                  ? 'text-amber-500 hover:text-amber-600'
+                  : 'text-neutral-400 hover:text-neutral-900'
+              }`}
+              title={isBookmarked ? 'Remove from My Schedule' : 'Save to My Schedule'}
+              aria-label="Bookmark event"
+            >
+              <Bookmark className={`w-4 h-4 ${isBookmarked ? 'fill-current' : ''}`} />
+            </button>
+          </div>
+
+          {/* Event Title */}
+          <h3
+            onClick={() => onOpenDetail(event)}
+            className="font-medium text-[15px] sm:text-[16px] text-neutral-900 leading-snug hover:text-neutral-600 transition-colors line-clamp-2 min-h-[2.6rem] cursor-pointer"
+            title={event.title}
+          >
+            {event.title}
+          </h3>
+        </div>
+
+        {/* The Signature Date Block: Giant Day Number + Stacked Month Syllables */}
+        <div className="pt-3 pb-2 flex items-baseline gap-2.5 select-none">
+          <span className="text-4xl sm:text-[44px] font-extrabold text-neutral-900 tracking-tighter leading-none">
+            {dayNumber}
+          </span>
+          <div className="flex flex-col text-[10px] font-semibold text-neutral-600 uppercase tracking-wider leading-[1.05]">
+            {monthParts.map((part, idx) => (
+              <span key={idx}>{part}</span>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Middle Section: Event Poster Image */}
       <div
         onClick={() => onOpenDetail(event)}
-        className="cursor-pointer relative h-40 sm:h-44 w-full bg-gradient-to-br from-slate-100 via-slate-50 to-slate-200 overflow-hidden select-none"
+        className="relative w-full aspect-[16/10] bg-neutral-100 overflow-hidden cursor-pointer"
       >
         {event.posterUrl ? (
           <img
@@ -178,332 +305,219 @@ export const EventCard: React.FC<EventCardProps> = ({
             }}
           />
         ) : (
-          <div className="w-full h-full flex flex-col items-center justify-center p-4 text-center bg-gradient-to-tr from-emerald-950/10 via-teal-900/5 to-slate-900/10">
-            <div className="w-12 h-12 rounded-xl bg-white shadow-xs border border-slate-200 flex items-center justify-center text-emerald-700 font-bold text-lg mb-2">
-              {event.eventType.slice(0, 1)}
-            </div>
-            <p className="text-xs font-semibold text-slate-700 line-clamp-1">{event.clubName}</p>
-            <p className="text-[11px] text-slate-500 font-medium">Sapthagiri NPS University</p>
+          <div className="w-full h-full flex flex-col items-center justify-center p-4 text-center bg-neutral-900 text-white">
+            <span className="text-xs uppercase tracking-widest text-neutral-400 font-medium">
+              Sapthagiri NPS University
+            </span>
+            <span className="text-sm font-bold mt-1 line-clamp-1 px-4">{event.clubName}</span>
           </div>
         )}
 
-        {/* Gradient Overlay for badges contrast */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/25 pointer-events-none" />
-
-        {/* Top Badges (Left & Right) */}
-        <div className="absolute top-2.5 left-2.5 right-2.5 flex items-start justify-between gap-1.5 pointer-events-none">
-          <div className="flex flex-wrap gap-1.5 items-center">
-            {/* Type badge with readable text and color */}
-            <span
-              className={`px-2.5 py-0.5 rounded-full text-[11px] border shadow-2xs ${getEventTypeBadgeClass(
-                event.eventType
-              )}`}
-            >
-              {event.eventType}
-            </span>
-
-            {/* Status badge with text */}
-            {statusConfig && (
-              <span
-                className={`px-2.5 py-0.5 rounded-full text-[11px] shadow-2xs ${statusConfig.bg}`}
-              >
-                {statusConfig.label}
-              </span>
-            )}
-          </div>
-
-          {/* Bookmark Button */}
-          <button
-            onClick={e => {
-              e.stopPropagation();
-              onToggleBookmark(event.id);
-            }}
-            className={`pointer-events-auto p-2 rounded-full transition shadow-md active:scale-90 ${
-              isBookmarked
-                ? 'bg-amber-400 text-slate-900 hover:bg-amber-300'
-                : 'bg-white/95 text-slate-700 hover:bg-white hover:text-amber-500'
-            }`}
-            title={isBookmarked ? 'Remove from My Schedule' : 'Add to My Schedule'}
-            aria-label="Bookmark event"
-          >
-            <Bookmark className={`w-4 h-4 ${isBookmarked ? 'fill-slate-900' : ''}`} />
-          </button>
+        {/* Free or Fee badge overlay */}
+        <div className="absolute bottom-2 left-2 pointer-events-none">
+          <span className="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider bg-black/75 backdrop-blur-xs text-white rounded-xs">
+            {event.entryFee || 'Free'}
+          </span>
         </div>
 
-        {/* Floating chips over image */}
-        <div className="absolute bottom-2.5 left-2.5 right-2.5 flex items-center justify-between text-white text-xs">
-          <div className="flex items-center gap-1.5 font-medium drop-shadow-md">
-            <Calendar className="w-3.5 h-3.5 text-emerald-300" />
-            <span>{formattedDate}</span>
-          </div>
-
-          {closingSoon && (
-            <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-600/90 text-white font-bold text-[10px] animate-pulse shadow-md">
-              <Flame className="w-3 h-3" />
-              {getClosingSoonText(event.registrationDeadline || '')}
+        {/* Seats booked badge for in-app events */}
+        {event.maxSeats && event.registrationType === 'in_app' && (
+          <div className="absolute bottom-2 right-2 pointer-events-none">
+            <span className="px-2 py-0.5 text-[10px] font-medium bg-white/90 backdrop-blur-xs text-neutral-900 rounded-xs">
+              {currentSeats}/{event.maxSeats} booked
             </span>
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
-      {/* Content Area */}
-      <div className="p-4 sm:p-5 flex-1 flex flex-col justify-between">
-        <div>
-          {/* Organizer Club Header with Verified checkmark */}
-          <div className="flex items-center justify-between gap-2 text-xs text-slate-600 mb-1.5">
-            <div className="flex items-center gap-1.5 truncate">
-              <span className="font-semibold text-slate-800 hover:text-emerald-700 transition truncate">
-                {event.clubName}
-              </span>
-              {event.isClubVerified && (
-                <span
-                  className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded-full bg-blue-50 text-blue-700 text-[10px] font-semibold border border-blue-200 shrink-0"
-                  title="Verified University Club"
-                >
-                  <ShieldCheck className="w-3 h-3 text-blue-600" />
-                  <span>Verified</span>
-                </span>
-              )}
-            </div>
-
-            {/* Entry Fee Badge */}
-            <span
-              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold border shrink-0 ${
-                !event.entryFee || event.entryFee.toLowerCase().includes('free')
-                  ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
-                  : 'bg-purple-50 text-purple-800 border-purple-200'
-              }`}
-            >
-              <Tag className="w-3 h-3" />
-              <span>{event.entryFee || 'Free'}</span>
-            </span>
-          </div>
-
-          {/* Title rendered as plain text */}
-          <h3
-            onClick={() => onOpenDetail(event)}
-            className="cursor-pointer font-bold text-base sm:text-lg text-slate-900 leading-snug hover:text-emerald-700 transition line-clamp-2 mb-2"
-          >
-            {event.title}
-          </h3>
-
-          {/* Short Description */}
-          <p className="text-slate-600 text-xs sm:text-sm line-clamp-2 mb-3 leading-relaxed">
-            {event.shortDescription}
-          </p>
-
-          {/* Special Status Note Box if Postponed or Venue Changed */}
-          {(event.status === 'Postponed' || event.status === 'Venue Changed') && event.statusNote && (
-            <div
-              className={`mb-3 p-2.5 rounded-xl border text-xs flex items-start gap-2 ${
-                event.status === 'Postponed'
-                  ? 'bg-orange-50 border-orange-200 text-orange-900'
-                  : 'bg-amber-50 border-amber-200 text-amber-950'
-              }`}
-            >
-              <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5 text-amber-600" />
-              <div>
-                <p className="font-bold text-[11px] uppercase tracking-wide">
-                  Update: {event.status}
-                </p>
-                <p className="font-medium mt-0.5">{event.statusNote}</p>
-                <p className="text-[10px] text-slate-500 mt-1">
-                  Updated: {new Date(event.lastUpdated).toLocaleDateString()}
-                </p>
+      {/* Sleek Dark Action Buttons Bar - Matching the Reference Image */}
+      <div className="w-full bg-[#1c1c1c] text-white flex items-stretch border-t border-neutral-800">
+        {event.registrationType === 'in_app' ? (
+          <>
+            {isRegistered ? (
+              <div className="flex-1 py-2.5 px-3 text-xs font-semibold text-emerald-400 flex items-center justify-center gap-1.5 border-r border-neutral-700">
+                <CheckCircle className="w-3.5 h-3.5" />
+                <span>Registered</span>
               </div>
-            </div>
-          )}
-
-          {/* Metadata Grid (Time, Venue in IST) */}
-          <div className="space-y-1.5 text-xs text-slate-600 mb-3 bg-slate-50/70 p-2.5 rounded-xl border border-slate-100">
-            <div className="flex items-center gap-2">
-              <Clock className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-              <span className="font-medium">{timeRange} (IST)</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <MapPin className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-              <span className="truncate font-medium">{event.venue}</span>
-            </div>
-          </div>
-
-          {/* Badges: Certificate, Prize */}
-          <div className="flex flex-wrap gap-1.5 items-center mb-4">
-            {event.certificateProvided && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 text-[11px] font-semibold border border-emerald-200">
-                <Award className="w-3 h-3 text-emerald-600" />
-                <span>Certificate</span>
-              </span>
+            ) : isCancelled ? (
+              <div className="flex-1 py-2.5 px-3 text-xs font-semibold text-neutral-400 text-center border-r border-neutral-700">
+                Cancelled
+              </div>
+            ) : isDeadlinePassed ? (
+              <div className="flex-1 py-2.5 px-3 text-xs font-semibold text-neutral-400 text-center border-r border-neutral-700">
+                Closed
+              </div>
+            ) : isFull ? (
+              <div className="flex-1 py-2.5 px-3 text-xs font-semibold text-amber-400 text-center border-r border-neutral-700">
+                Full
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={e => {
+                  e.stopPropagation();
+                  onOpenRegister ? onOpenRegister(event) : onOpenDetail(event);
+                }}
+                className="flex-1 py-2.5 px-3 text-xs font-semibold text-center hover:bg-black transition-colors border-r border-neutral-700 tracking-wide"
+              >
+                Register
+              </button>
             )}
 
-            {event.prize && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-50 text-amber-900 text-[11px] font-semibold border border-amber-200">
-                <Trophy className="w-3 h-3 text-amber-600" />
-                <span className="truncate max-w-[170px]">{event.prize}</span>
-              </span>
-            )}
-          </div>
-        </div>
-
-        {/* Action Buttons Section */}
-        <div className="pt-2 border-t border-slate-100 flex flex-col gap-2">
-          {/* Interested button + WhatsApp Share button */}
-          <div className="flex items-center justify-between gap-2 text-xs">
-            {/* Interested Button */}
             <button
-              onClick={handleInterestedToggle}
-              className={`flex-1 py-1.5 px-3 rounded-xl border font-semibold flex items-center justify-center gap-1.5 transition active:scale-95 ${
-                interested
-                  ? 'bg-rose-50 border-rose-200 text-rose-700 font-bold'
-                  : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
-              }`}
-              title={interested ? 'Remove Interested mark' : 'Mark as Interested'}
+              type="button"
+              onClick={e => {
+                e.stopPropagation();
+                onOpenDetail(event);
+              }}
+              className="flex-1 py-2.5 px-3 text-xs font-medium text-center text-neutral-200 hover:bg-black transition-colors tracking-wide"
             >
-              <Heart className={`w-3.5 h-3.5 ${interested ? 'fill-rose-600 text-rose-600' : ''}`} />
-              <span>{interested ? 'Interested' : 'Interested?'} ({interestedCount})</span>
+              More info
             </button>
-
-            {/* WhatsApp Share Button */}
+          </>
+        ) : event.registrationType === 'external' && event.registrationLink ? (
+          <>
             <a
-              href={shareWhatsAppUrl}
+              href={event.registrationLink}
               target="_blank"
               rel="noopener noreferrer"
-              className="py-1.5 px-3 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 font-semibold flex items-center gap-1 transition"
-              title="Share event on WhatsApp"
+              onClick={e => e.stopPropagation()}
+              className="flex-1 py-2.5 px-3 text-xs font-semibold text-center hover:bg-black transition-colors border-r border-neutral-700 flex items-center justify-center gap-1 tracking-wide"
             >
-              <Share2 className="w-3.5 h-3.5 text-emerald-600" />
-              <span>Share</span>
+              <span>Register</span>
+              <ExternalLink className="w-3 h-3 text-neutral-400" />
             </a>
+
+            <button
+              type="button"
+              onClick={e => {
+                e.stopPropagation();
+                onOpenDetail(event);
+              }}
+              className="flex-1 py-2.5 px-3 text-xs font-medium text-center text-neutral-200 hover:bg-black transition-colors tracking-wide"
+            >
+              More info
+            </button>
+          </>
+        ) : (
+          <button
+            type="button"
+            onClick={e => {
+              e.stopPropagation();
+              onOpenDetail(event);
+            }}
+            className="w-full py-2.5 px-4 text-xs font-semibold text-center text-white hover:bg-black transition-colors tracking-wide"
+          >
+            More info
+          </button>
+        )}
+      </div>
+
+      {/* Subtle Bottom Metadata Row: Organizer, Time & Venue */}
+      <div className="px-4 py-2.5 bg-neutral-50/80 border-t border-neutral-100 text-[11px] text-neutral-600 flex flex-col gap-1">
+        <div className="flex items-center justify-between gap-2">
+          <span className="font-semibold text-neutral-800 truncate" title={event.clubName}>
+            {event.clubName}
+          </span>
+          <span className="text-neutral-500 shrink-0">{timeRange}</span>
+        </div>
+
+        <div className="flex items-center justify-between gap-2 text-neutral-500">
+          <div className="flex items-center gap-1 truncate">
+            <MapPin className="w-3 h-3 shrink-0 text-neutral-400" />
+            <span className="truncate">{event.venue}</span>
           </div>
 
-          {/* Student Actions: Google Calendar & WhatsApp Coordinator */}
-          <div className="grid grid-cols-2 gap-2">
+          {/* Quick social / calendar actions */}
+          <div className="flex items-center gap-1.5 shrink-0">
+            <button
+              onClick={handleInterestedToggle}
+              className={`p-1 rounded transition hover:text-rose-600 ${
+                interested ? 'text-rose-600 font-bold' : 'text-neutral-400'
+              }`}
+              title={interested ? 'Marked interested' : 'Mark interested'}
+            >
+              <Heart className={`w-3 h-3 ${interested ? 'fill-current' : ''}`} />
+            </button>
+
             <a
               href={googleCalUrl}
               target="_blank"
               rel="noopener noreferrer"
               onClick={handleCalendarClick}
-              className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition active:scale-95"
-              title="Add to Google Calendar (IST)"
+              className="p-1 text-neutral-400 hover:text-blue-600 transition"
+              title="Add to Google Calendar"
             >
-              <Calendar className="w-3.5 h-3.5 text-blue-600" />
-              <span>Google Cal</span>
+              <Calendar className="w-3 h-3" />
             </a>
 
             <a
-              href={whatsAppUrl}
+              href={shareWhatsAppUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-xs font-semibold border border-emerald-200 transition active:scale-95"
-              title={`Ask coordinator via WhatsApp: ${maskPhoneNumber(event.contactWhatsApp)}`}
+              onClick={e => e.stopPropagation()}
+              className="p-1 text-neutral-400 hover:text-emerald-600 transition"
+              title="Share on WhatsApp"
             >
-              <MessageCircle className="w-3.5 h-3.5 text-emerald-600" />
-              <span>WhatsApp</span>
+              <Share2 className="w-3 h-3" />
             </a>
           </div>
-
-          {/* Student Registration Button (In-app, External, Registered, or Closed) */}
-          {event.registrationType === 'in_app' && (
-            <div className="w-full">
-              {isRegistered ? (
-                <div className="w-full py-2 px-3 rounded-xl bg-emerald-50 border border-emerald-300 text-emerald-800 text-xs font-bold flex items-center justify-center gap-1.5 shadow-2xs">
-                  <CheckCircle className="w-4 h-4 text-emerald-600" />
-                  <span>Registered</span>
-                </div>
-              ) : isCancelled ? (
-                <div className="w-full py-2 px-3 rounded-xl bg-slate-100 border border-slate-200 text-slate-500 text-xs font-semibold flex items-center justify-center">
-                  <span>Event Cancelled</span>
-                </div>
-              ) : isDeadlinePassed ? (
-                <div className="w-full py-2 px-3 rounded-xl bg-slate-100 border border-slate-200 text-slate-500 text-xs font-semibold flex items-center justify-center">
-                  <span>Registration Closed</span>
-                </div>
-              ) : isFull ? (
-                <div className="w-full py-2 px-3 rounded-xl bg-amber-50 border border-amber-300 text-amber-900 text-xs font-bold flex items-center justify-center">
-                  <span>Registrations full</span>
-                </div>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => (onOpenRegister ? onOpenRegister(event) : onOpenDetail(event))}
-                  className="w-full py-2 px-3.5 rounded-xl bg-[#0F1B2D] hover:bg-[#1A2B44] text-white text-xs font-bold transition btn-press shadow-xs flex items-center justify-between"
-                >
-                  <span>Register</span>
-                  {seatsLeft !== null && (
-                    <span className="text-[11px] font-semibold text-[#C59A3F]">
-                      {seatsLeft} {seatsLeft === 1 ? 'seat' : 'seats'} left
-                    </span>
-                  )}
-                </button>
-              )}
-            </div>
-          )}
-
-          {event.registrationType === 'external' && event.registrationLink && (
-            <a
-              href={event.registrationLink}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="w-full py-2 px-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition btn-press shadow-xs flex items-center justify-center gap-1.5"
-            >
-              <span>Register (External)</span>
-              <ExternalLink className="w-3.5 h-3.5" />
-            </a>
-          )}
-
-          {/* Detail View Trigger */}
-          <button
-            onClick={() => onOpenDetail(event)}
-            className="w-full py-1 text-center text-xs font-semibold text-emerald-700 hover:text-emerald-800 hover:underline flex items-center justify-center gap-1"
-          >
-            <span>View Full Details</span>
-            <ExternalLink className="w-3 h-3" />
-          </button>
-
-          {/* Club Coordinator Management Tools (when owner) */}
-          {isOwner && (
-            <div className="mt-2 pt-2 border-t border-slate-200 space-y-1.5">
-              {event.registrationType === 'in_app' && (
-                <button
-                  type="button"
-                  onClick={() => onOpenParticipants && onOpenParticipants(event)}
-                  className="w-full py-1.5 px-3 rounded-xl bg-blue-50 border border-blue-200 hover:bg-blue-100 text-blue-800 text-[11px] font-bold flex items-center justify-center gap-1.5 transition active:scale-95 shadow-2xs"
-                  title="View registered student participants and download CSV"
-                >
-                  <Users className="w-3.5 h-3.5 text-blue-600" />
-                  <span>Participants ({getEventRegistrations(event.id).length})</span>
-                </button>
-              )}
-              <div className="grid grid-cols-3 gap-1.5 bg-slate-50 p-1.5 rounded-xl">
-                <button
-                  onClick={() => onEdit && onEdit(event)}
-                  className="py-1 px-2 rounded-lg bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 text-[11px] font-semibold flex items-center justify-center gap-1"
-                  title="Edit Event"
-                >
-                  <Edit2 className="w-3 h-3 text-blue-600" />
-                  <span>Edit</span>
-                </button>
-
-                <button
-                  onClick={() => onDuplicate && onDuplicate(event)}
-                  className="py-1 px-2 rounded-lg bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 text-[11px] font-semibold flex items-center justify-center gap-1"
-                  title="Duplicate event to form"
-                >
-                  <Copy className="w-3 h-3 text-purple-600" />
-                  <span>Copy</span>
-                </button>
-
-                <button
-                  onClick={() => onDelete && onDelete(event.id)}
-                  className="py-1 px-2 rounded-lg bg-white border border-red-200 hover:bg-red-50 text-red-600 text-[11px] font-semibold flex items-center justify-center gap-1"
-                  title="Delete Event"
-                >
-                  <Trash2 className="w-3 h-3" />
-                  <span>Delete</span>
-                </button>
-              </div>
-            </div>
-          )}
         </div>
+
+        {/* Club Coordinator Management Tools (when owner) */}
+        {isOwner && (
+          <div className="mt-2 pt-2 border-t border-neutral-200 flex items-center justify-between gap-1 text-[11px]">
+            {event.registrationType === 'in_app' && (
+              <button
+                type="button"
+                onClick={e => {
+                  e.stopPropagation();
+                  onOpenParticipants && onOpenParticipants(event);
+                }}
+                className="py-1 px-2 rounded bg-neutral-200 hover:bg-neutral-300 text-neutral-900 font-semibold flex items-center gap-1"
+                title="View registered students"
+              >
+                <Users className="w-3 h-3" />
+                <span>({getEventRegistrations(event.id).length})</span>
+              </button>
+            )}
+
+            <div className="flex items-center gap-1 ml-auto">
+              <button
+                onClick={e => {
+                  e.stopPropagation();
+                  onEdit && onEdit(event);
+                }}
+                className="py-1 px-2 rounded bg-white border border-neutral-300 hover:bg-neutral-100 text-neutral-700"
+                title="Edit Event"
+              >
+                <Edit2 className="w-3 h-3 text-blue-600" />
+              </button>
+
+              <button
+                onClick={e => {
+                  e.stopPropagation();
+                  onDuplicate && onDuplicate(event);
+                }}
+                className="py-1 px-2 rounded bg-white border border-neutral-300 hover:bg-neutral-100 text-neutral-700"
+                title="Duplicate event"
+              >
+                <Copy className="w-3 h-3 text-purple-600" />
+              </button>
+
+              <button
+                onClick={e => {
+                  e.stopPropagation();
+                  onDelete && onDelete(event.id);
+                }}
+                className="py-1 px-2 rounded bg-white border border-red-200 hover:bg-red-50 text-red-600"
+                title="Delete Event"
+              >
+                <Trash2 className="w-3 h-3" />
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </article>
   );

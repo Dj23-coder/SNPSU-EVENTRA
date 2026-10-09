@@ -1,7 +1,7 @@
 import { EventItem, ClubUser, ClashResult, ReportItem, ReportReason, EventRegistration, ClubAccessRequest } from '../types';
 import { getInitialEvents, INITIAL_CLUBS, getInitialRegistrations, INITIAL_ACCESS_REQUESTS } from '../data/sampleData';
 
-const EVENTS_STORAGE_KEY = 'snpsu_eventra_events_v3';
+const EVENTS_STORAGE_KEY = 'snpsu_eventra_events_v4';
 const BOOKMARKS_STORAGE_KEY = 'snpsu_eventra_bookmarks_v3';
 const CLUBS_STORAGE_KEY = 'snpsu_eventra_clubs_v3';
 const INTERESTED_STORAGE_KEY = 'snpsu_eventra_interested_v3';

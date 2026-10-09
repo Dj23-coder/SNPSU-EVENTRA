@@ -27,13 +27,9 @@ import {
 } from './services/storageService';
 import { EventItem, EventType, QuickFilter, EventStatus } from './types';
 import {
-  Sparkles,
-  Calendar,
   AlertCircle,
   CheckCircle,
-  PlusCircle,
   RotateCcw,
-  Bot,
 } from 'lucide-react';
 
 function EventraMain() {
@@ -59,6 +55,7 @@ function EventraMain() {
   const [selectedClubId, setSelectedClubId] = useState<string>('all');
   const [quickFilter, setQuickFilter] = useState<QuickFilter>('all');
   const [showPastEvents, setShowPastEvents] = useState(false);
+  const [showAllEventsExpanded, setShowAllEventsExpanded] = useState(false);
 
   // Modals State
   const [detailModalEvent, setDetailModalEvent] = useState<EventItem | null>(null);
@@ -228,7 +225,6 @@ function EventraMain() {
     } else if (quickFilter === 'prize') {
       result = result.filter(e => Boolean(e.prize && e.prize.trim()));
     } else if (quickFilter === 'free') {
-      // Entry fee is Free
       result = result.filter(e => !e.entryFee || e.entryFee.toLowerCase().includes('free') || e.entryFee === '0');
     }
 
@@ -251,11 +247,36 @@ function EventraMain() {
     return events.filter(e => bookmarkedIds.includes(e.id) && !e.hidden);
   }, [events, bookmarkedIds]);
 
+  const isFilteringActive = Boolean(
+    searchQuery.trim() ||
+    selectedType !== 'all' ||
+    selectedClubId !== 'all' ||
+    quickFilter !== 'all'
+  );
+
+  // Group events into Upcoming (first 4) and Secondary/Past (next 4+) to match reference layout
+  const upcomingGroup = useMemo(() => {
+    if (isFilteringActive) return filteredEvents;
+    return filteredEvents.slice(0, 4);
+  }, [filteredEvents, isFilteringActive]);
+
+  const secondaryGroup = useMemo(() => {
+    if (isFilteringActive) return [];
+    return filteredEvents.slice(4);
+  }, [filteredEvents, isFilteringActive]);
+
+  const handleTriggerSearchFocus = () => {
+    setCurrentTab('feed');
+    setTimeout(() => {
+      document.getElementById('events-search-input')?.focus();
+    }, 100);
+  };
+
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col font-sans text-slate-900 selection:bg-emerald-500 selection:text-white">
+    <div className="min-h-screen bg-[#FAFAFA] flex flex-col font-sans text-neutral-900 selection:bg-neutral-900 selection:text-white relative">
       {/* Toast Alert */}
       {toastMessage && (
-        <div className="fixed bottom-6 right-6 z-50 bg-slate-900 text-white px-4 py-3 rounded-2xl shadow-2xl border border-slate-700 text-xs font-semibold flex items-center gap-2 animate-in fade-in slide-in-from-bottom-3 duration-200">
+        <div className="fixed bottom-6 right-6 z-50 bg-neutral-900 text-white px-4 py-3 rounded-lg shadow-2xl text-xs font-semibold flex items-center gap-2 animate-in fade-in slide-in-from-bottom-3 duration-200">
           <CheckCircle className="w-4 h-4 text-emerald-400 shrink-0" />
           <span>{toastMessage}</span>
         </div>
@@ -275,55 +296,56 @@ function EventraMain() {
         }
         onOpenLoginModal={() => setIsAuthModalOpen(true)}
         onOpenAdminReportsModal={() => setIsAdminReportsOpen(true)}
+        onTriggerSearch={handleTriggerSearchFocus}
       />
 
-      {/* Main Container */}
-      <main className="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 w-full">
-        {/* VIEW 1: Events Feed (Default Student View) */}
+      {/* Right-edge Vertical Editorial Ribbon Matching Reference UI */}
+      <div
+        className="hidden 2xl:flex fixed right-0 top-20 bottom-0 w-8 bg-neutral-950 text-white items-center justify-around overflow-hidden z-30 select-none pointer-events-none py-10"
+        aria-hidden="true"
+      >
+        <div className="writing-mode-vertical text-[10px] font-mono tracking-widest uppercase text-neutral-400 whitespace-nowrap rotate-180">
+          sapthagiri nps university website. • snpsu eventra portal. • sapthagiri nps university website.
+        </div>
+      </div>
+
+      {/* Main Content Area */}
+      <main className="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
+        {/* VIEW 1: Events Feed (Default Student View Matching Reference Screenshot) */}
         {currentTab === 'feed' && (
-          <div className="space-y-6">
-            {/* Campus Hero Welcome Banner */}
-            <div className="relative rounded-3xl overflow-hidden bg-gradient-to-r from-emerald-950 via-teal-900 to-slate-900 text-white p-6 sm:p-10 shadow-lg border border-emerald-900/40">
-              <div className="relative z-10 max-w-2xl space-y-3">
-                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 backdrop-blur-md text-emerald-300 text-xs font-bold uppercase tracking-wider border border-white/10">
-                  <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
-                  <span>Sapthagiri NPS University Campus Live</span>
+          <div className="space-y-10">
+            {/* Header Hero Area: Breadcrumb, Main Title, and Giant Outlined 'Events' Typography */}
+            <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-6 border-b border-neutral-200">
+              <div className="max-w-xl space-y-3">
+                {/* Breadcrumb line from reference design */}
+                <div className="flex items-center gap-2 text-xs text-neutral-500 font-medium">
+                  <span
+                    className="hover:text-black cursor-pointer transition-colors"
+                    onClick={() => setCurrentTab('feed')}
+                  >
+                    Main page
+                  </span>
+                  <span>/</span>
+                  <span className="text-neutral-900 font-semibold">Events</span>
                 </div>
-                <h1 className="text-2xl sm:text-4xl font-black tracking-tight leading-tight">
-                  One Unified Hub for Every Campus Event.
+
+                {/* Main Heading */}
+                <h1 className="text-4xl sm:text-6xl font-extrabold tracking-tight text-neutral-900 leading-none">
+                  Events
                 </h1>
-                <p className="text-slate-300 text-xs sm:text-sm leading-relaxed max-w-xl">
-                  Never miss university hackathons, workshops, cultural fests, or guest talks. Real-time updates directly from authorized SNPSU clubs.
+
+                {/* Subtitle paragraph */}
+                <p className="text-neutral-600 text-xs sm:text-sm leading-relaxed max-w-lg">
+                  Sapthagiri NPS University events take place throughout the year, from technical hackathons, workshops, and AI keynotes to cultural fests, exhibitions, and sports championships. Real-time updates directly from authorized SNPSU clubs.
                 </p>
-
-                <div className="pt-2 flex flex-wrap items-center gap-3">
-                  <button
-                    onClick={() => setCurrentTab('calendar')}
-                    className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white text-slate-900 font-bold text-xs shadow-md hover:bg-slate-100 transition active:scale-95"
-                  >
-                    <Calendar className="w-4 h-4 text-emerald-700" />
-                    <span>View Calendar</span>
-                  </button>
-
-                  <button
-                    onClick={() => setCurrentTab('ask-ai')}
-                    className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-md transition active:scale-95"
-                  >
-                    <Bot className="w-4 h-4" />
-                    <span>Ask Campus AI</span>
-                  </button>
-
-                  <button
-                    onClick={() => setCurrentTab('schedule')}
-                    className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white/15 hover:bg-white/25 text-white font-semibold text-xs border border-white/20 transition backdrop-blur-sm"
-                  >
-                    <span>My Schedule ({bookmarkedIds.length})</span>
-                  </button>
-                </div>
               </div>
 
-              {/* Decorative background glow */}
-              <div className="absolute -right-10 -bottom-10 w-80 h-80 rounded-full bg-emerald-500/10 blur-3xl pointer-events-none" />
+              {/* Artistic Outlined 'Events' Typography from Reference Design */}
+              <div className="hidden md:block select-none pointer-events-none pr-2">
+                <span className="text-outline-hero font-extrabold tracking-tighter text-7xl sm:text-8xl lg:text-9xl leading-none">
+                  Events
+                </span>
+              </div>
             </div>
 
             {/* Filter and Search Bar */}
@@ -340,17 +362,17 @@ function EventraMain() {
               totalResults={filteredEvents.length}
             />
 
-            {/* Events Grid or Empty State */}
+            {/* Event Cards Section */}
             {filteredEvents.length === 0 ? (
-              <div className="bg-white rounded-3xl p-12 text-center border border-slate-200 shadow-xs space-y-4">
-                <div className="w-16 h-16 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center mx-auto">
-                  <AlertCircle className="w-8 h-8" />
+              <div className="bg-white border border-neutral-200 p-12 text-center space-y-4 shadow-xs">
+                <div className="w-14 h-14 bg-neutral-100 text-neutral-400 flex items-center justify-center mx-auto rounded-full">
+                  <AlertCircle className="w-6 h-6" />
                 </div>
-                <h3 className="text-lg font-bold text-slate-800">
+                <h3 className="text-base font-bold text-neutral-900">
                   No Matching Campus Events Found
                 </h3>
-                <p className="text-xs sm:text-sm text-slate-500 max-w-md mx-auto">
-                  Try clearing your search terms or selecting "All Upcoming" to view all scheduled activities at Sapthagiri NPS University.
+                <p className="text-xs text-neutral-500 max-w-md mx-auto">
+                  Try clearing your search terms or selecting "All Events" to view all scheduled university activities.
                 </p>
                 <div className="pt-2">
                   <button
@@ -360,42 +382,113 @@ function EventraMain() {
                       setSelectedClubId('all');
                       setQuickFilter('all');
                     }}
-                    className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs transition"
+                    className="px-5 py-2.5 bg-neutral-900 hover:bg-black text-white font-semibold text-xs transition"
                   >
                     Reset All Filters
                   </button>
                 </div>
               </div>
+            ) : isFilteringActive ? (
+              /* Filtered View: Single Unified Grid of Results */
+              <div className="space-y-4">
+                <h2 className="text-xl font-bold tracking-tight text-neutral-900">
+                  Filtered Results ({filteredEvents.length})
+                </h2>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                  {filteredEvents.map(event => (
+                    <EventCard
+                      key={event.id}
+                      event={event}
+                      isBookmarked={bookmarkedIds.includes(event.id)}
+                      onToggleBookmark={handleToggleBookmark}
+                      onOpenDetail={handleOpenDetail}
+                      onOpenRegister={setRegisterModalEvent}
+                      onOpenParticipants={setParticipantsModalEvent}
+                      isOwner={isAdmin || (isClub && currentUser?.id === event.clubId)}
+                      onEdit={handleEditEvent}
+                      onDelete={handleDeleteEvent}
+                      onDuplicate={handleDuplicateEvent}
+                    />
+                  ))}
+                </div>
+              </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {filteredEvents.map(event => (
-                  <EventCard
-                    key={event.id}
-                    event={event}
-                    isBookmarked={bookmarkedIds.includes(event.id)}
-                    onToggleBookmark={handleToggleBookmark}
-                    onOpenDetail={handleOpenDetail}
-                    onOpenRegister={setRegisterModalEvent}
-                    onOpenParticipants={setParticipantsModalEvent}
-                    isOwner={isAdmin || (isClub && currentUser?.id === event.clubId)}
-                    onEdit={handleEditEvent}
-                    onDelete={handleDeleteEvent}
-                    onDuplicate={handleDuplicateEvent}
-                  />
-                ))}
+              /* Standard Unfiltered View: "Upcoming events" + "Past events" Matching the Reference Screenshot */
+              <div className="space-y-14">
+                {/* Section 1: Upcoming events (4-column grid) */}
+                <section className="space-y-6">
+                  <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-neutral-900">
+                    Upcoming events
+                  </h2>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                    {upcomingGroup.map(event => (
+                      <EventCard
+                        key={event.id}
+                        event={event}
+                        isBookmarked={bookmarkedIds.includes(event.id)}
+                        onToggleBookmark={handleToggleBookmark}
+                        onOpenDetail={handleOpenDetail}
+                        onOpenRegister={setRegisterModalEvent}
+                        onOpenParticipants={setParticipantsModalEvent}
+                        isOwner={isAdmin || (isClub && currentUser?.id === event.clubId)}
+                        onEdit={handleEditEvent}
+                        onDelete={handleDeleteEvent}
+                        onDuplicate={handleDuplicateEvent}
+                      />
+                    ))}
+                  </div>
+                </section>
+
+                {/* Section 2: Past events / Additional Campus Events (4-column grid) */}
+                {secondaryGroup.length > 0 && (
+                  <section className="space-y-6 pt-4 border-t border-neutral-200">
+                    <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-neutral-900">
+                      Past events
+                    </h2>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                      {(showAllEventsExpanded ? secondaryGroup : secondaryGroup.slice(0, 4)).map(event => (
+                        <EventCard
+                          key={event.id}
+                          event={event}
+                          isBookmarked={bookmarkedIds.includes(event.id)}
+                          onToggleBookmark={handleToggleBookmark}
+                          onOpenDetail={handleOpenDetail}
+                          onOpenRegister={setRegisterModalEvent}
+                          onOpenParticipants={setParticipantsModalEvent}
+                          isOwner={isAdmin || (isClub && currentUser?.id === event.clubId)}
+                          onEdit={handleEditEvent}
+                          onDelete={handleDeleteEvent}
+                          onDuplicate={handleDuplicateEvent}
+                        />
+                      ))}
+                    </div>
+
+                    {/* Clean Outline "See more events" Button Matching Reference UI */}
+                    <div className="text-center pt-8">
+                      <button
+                        onClick={() => setShowAllEventsExpanded(prev => !prev)}
+                        className="inline-flex items-center justify-center px-8 py-2.5 border border-neutral-400 text-neutral-800 text-xs font-semibold tracking-wider uppercase hover:border-black hover:bg-neutral-900 hover:text-white transition duration-200"
+                      >
+                        {showAllEventsExpanded ? 'Show fewer events' : 'See more events'}
+                      </button>
+                    </div>
+                  </section>
+                )}
               </div>
             )}
 
-            {/* Bottom utility tools */}
-            <div className="flex items-center justify-between text-xs text-slate-500 pt-4">
-              <label className="flex items-center gap-2 cursor-pointer hover:text-slate-700">
+            {/* Bottom Utility Tools: Past Archives Toggle and Sample Data Reset */}
+            <div className="flex items-center justify-between text-xs text-neutral-500 pt-8 border-t border-neutral-200">
+              <label className="flex items-center gap-2 cursor-pointer hover:text-neutral-900 select-none">
                 <input
                   type="checkbox"
                   checked={showPastEvents}
                   onChange={e => setShowPastEvents(e.target.checked)}
-                  className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+                  className="rounded border-neutral-300 text-neutral-900 focus:ring-black"
                 />
-                <span>Include archived past events</span>
+                <span>Include archived past events in query</span>
               </label>
 
               <button
@@ -406,7 +499,7 @@ function EventraMain() {
                     showToast('Events reset to initial university samples.');
                   }
                 }}
-                className="flex items-center gap-1 text-slate-400 hover:text-slate-600 transition"
+                className="flex items-center gap-1.5 text-neutral-400 hover:text-neutral-900 transition"
                 title="Reset sample events"
               >
                 <RotateCcw className="w-3.5 h-3.5" />
@@ -535,7 +628,7 @@ function EventraMain() {
         onClose={() => setIsAuthModalOpen(false)}
       />
 
-      {/* University Footer */}
+      {/* University Footer Matching Reference Screenshot */}
       <Footer
         onOpenTerms={() => setIsTermsOpen(true)}
       />
